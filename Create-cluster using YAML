@@ -1,0 +1,31 @@
+==> Practice Purpose;
+eksctl YAML — create-eks-cluster.yaml
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: kartik-eks-cluster
+  region: us-east-1
+  version: "1.32"   # You can change Kubernetes version if needed
+
+availabilityZones:
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
+
+nodeGroups:
+  - name: worker-ng
+    instanceType: t2.micro
+    desiredCapacity: 3
+    minSize: 3
+    maxSize: 3
+    volumeSize: 30
+    ssh:
+      publicKeyName: jenkins-kartik
+    availabilityZones:
+      - us-east-1a
+      - us-east-1b
+      - us-east-1c
+
+eksctl create cluster -f create-eks-cluster.yaml
