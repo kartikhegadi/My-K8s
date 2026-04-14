@@ -51,3 +51,36 @@ eksctl create cluster --name kastro-cluster --region ap-south-1 --node-type t2.m
 eksctl delete cluster --name kastro-cluster --region ap-south-1
 
 ------------------------------------------
+Check Nodes 
+
+kubectl get nodes 
+kubectl get pods 
+kubectl api-resources
+
+kubectl explain pod.apiVersion 
+kubectl explain services.apiVersion
+
+kubectl api-resources | grep -i deployment 
+
+----------------------------------------------------
+list clusters 
+
+aws eks list-clusters --region ap-south-1
+
+{
+    "clusters": [
+        "kartik-cluster"
+    ]
+}
+
+----------------------------------------------------
+Basic Commands;
+
+kubectl apply -f <YAML FILE NAME>
+OR
+kubectl create -f <YAML FILE NAME>
+
+To delete the resources which are created by using a specific yaml file
+kubectl delete -f <YAML FILE NAME>
+
+----------------------------------------------------
