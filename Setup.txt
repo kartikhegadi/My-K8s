@@ -1,0 +1,53 @@
+setting up K8s in amazon cloud 
+--------------------------------------------------------------------
+I use ubuntu 
+--
+How to create a cluster?
+4 methods of creating a cluster;
+AWS Console ---> EKS ----> Create Cluster ----> Configure the info ----> Cluster is ready
+CLI** (Command Line Interface) ----> Create the cluster using commands
+Terraform ----> tf files
+YAML ----> yml
+
+
+Create sh script for all and run it 
+------------------------------------------
+How to create a cluster?
+4 methods of creating a cluster;
+AWS Console ---> EKS ----> Create Cluster ----> Configure the info ----> Cluster is ready
+CLI** (Command Line Interface) ----> Create the cluster using commands
+Terraform ----> tf files
+YAML ----> yml 
+
+=> Install kubectl 
+curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.19.6/2021-01-05/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin
+kubectl version --short --client
+
+=> Install AWS CLI latest version 
+sudo apt install unzip
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+aws --version
+
+=> Install eksctl
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+eksctl version
+
+=> Creation of Cluster
+eksctl create cluster --name kastro-cluster --region ap-south-1 --node-type t2.medium  --zones ap-south-1a,ap-south-1b
+
+The above commands uses some default values;
+It creates 2 worker nodes
+These 2 worker nodes will have 80 GB capacity
+These 2 worker nodes doesn't have the key-pair ----> You cannot connect with the worker nodes
+
+eksctl create cluster --name kastro-cluster --region ap-south-1 --node-type t2.medium  --zones ap-south-1a,ap-south-1b,ap-south-1c --nodes 5
+
+#To delete the cluster
+eksctl delete cluster --name kastro-cluster --region ap-south-1
+
+------------------------------------------
