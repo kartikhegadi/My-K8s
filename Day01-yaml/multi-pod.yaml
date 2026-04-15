@@ -1,0 +1,23 @@
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: nginx-sidecar
+spec:
+  containers:
+  name: nginx-sidecar-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80
+  
+  - name: log-trailer-container
+    image: busybox:latest
+    command: ["sh", "-c" ]
+    args: ["tail -f /var/log/nginx/access.log"]
+    volumeMounts:
+    - name: nginx-logs
+      mountPath: /var/log/nginx
+  volumes:
+  - name: nginx-logs
+    emptyDir: {}  
+    
+   
