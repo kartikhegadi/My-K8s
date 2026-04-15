@@ -1,0 +1,85 @@
+Namespace:
+
+By default all the resources in Kubernetes will get created in the "default" namespace
+
+Namespace is sused for logical isolation of all the K8s resources to a perticular application 
+
+Default namespaes of K8s
+-default --- > wehnever we crete any pods then it will be creted in default only  
+-Kube-node-lease
+-Kube-public
+-Kube-system
+-----------------------------------------------------------------------------
+Creating namespace
+kubectl create ns <namespace>
+
+show name space 
+kubectl get ns
+
+how to check in which name space we are present 
+1)kubectl get pods
+2)kubectl config view --- it wont show anything if we are in default namespace
+----------------------------SET and Check----------------------------
+kubectl config set-context --current --namespace=dev
+kubectl get pods
+kubectl config view
+
+----------------------------Practice----------------------------
+kubectl config set-context --current --namespace=dev
+
+kubectl run dev-pod1 --image nginx
+kubectl run dev-pod2 --image nginx
+kubectl run dev-pod3 --image nginx
+kubectl run dev-pod4 --image nginx
+
+kubectl get pods
+
+
+kubectl config set-context --current --namespace=default
+
+kubectl get pods
+kubectl config view
+
+kubectl get ns
+
+select specifics name speace pods 
+kubectl get pods -n <namespace>
+ 
+kubectl get pods -n dev
+
+
+kubectl config set-context --current --namespace=test
+
+
+kubectl run test-pod1 --image nginx
+kubectl run test-pod2 --image nginx
+kubectl run test-pod3 --image nginx
+kubectl run test-pod4 --image nginx
+
+kubectl get pods
+kubectl config view
+
+------------------------------------------------------------------------------------
+Can we see pods which are in differnt namespace from preset 
+ex from test to see pods of dev -- yes we can see 
+how? 
+-- present you are in test ---> run this commad 
+kubectl get pods -n dev
+------------------------------------------------------------------------------------
+Can we delete pods which are in differnt namespace from preset 
+ex from test to see pods of dev -- yes we can delete -- but this is not good practice but we need to set RBAC
+
+kubectl delete pod dev-pod1 -n dev
+
+------------------------------------------------------------------------------------
+In same way we can see the services which are created in differnt namespace too 
+
+kubectl get svc -n test
+kubectl get svc -n dev
+
+-------------------------------Deleting NameSpace----------------------------------------------------
+everything which is created in name space will get deleted 
+
+kubectl delete ns <namespce>
+
+
