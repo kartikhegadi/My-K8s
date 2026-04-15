@@ -80,7 +80,223 @@ kubectl apply -f <YAML FILE NAME>
 OR
 kubectl create -f <YAML FILE NAME>
 
+ex single-pod.yaml
+
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: single-pod
+  labels:
+    app: single-pod
+spec:
+  containers:
+  - name: single-pod-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80 
+
+kubectl apply -f single-pod.yaml
+
+
+
 To delete the resources which are created by using a specific yaml file
+
 kubectl delete -f <YAML FILE NAME>
 
 ----------------------------------------------------
+Types of pods;
+
+Single container pod
+Multi container (side car container) pod
+
+For every pod you will get unique pod IP.
+When a pod gets deleted, the ip address will also get deleted - Pods are called as ephemeral
+CNI  plugin is responsible to allocate the pod IPs
+
+
+----------------------------------------------------
+kubectl get pods
+kubectl get nodes
+kubetctl get pods -o wide
+ 
+kubectl get pods
+kubectl get pod
+kubectl get po
+
+kubectl get pods 
+kubectl apply -f single-pod.yaml
+
+kubectl describe pod single-container-pod
+
+----------------------------------------------------
+
+Single container pod
+kubectl exec -it single-pod -- bash 
+
+Multi container pod
+
+kubectl exec -it single-pod -container  <containername> -- bash 
+or
+kubectl exec -it single-pod -c <containername> -- sh 
+
+kubectl logs -f nginx-sidecar -c log-trailer-container
+or
+
+wget -qO- http://localhost
+
+
+-----------------------------------------------------
+By default the apps running inside a pod can only be accessible within the cluster
+If you want to access the application outside of the cluster, we will use Kubernetes Services
+----------------------------------------------------
+Kubernetes Services;
+Kubernetes services are used to expose our application outside of the cluster.
+
+Types of K8s Services;
+ClusterIP		- default	- will not allow to access the app in the browser
+NodePort
+LoadBalancer
+
+Pod manifest file - contains pod information
+Service manifest file - contains how you want to expose your application
+	To tell to service to expose an app which is running inside a pod, we will use "selector"
+	Selector will select the pods by using pod labels
+
+NodePort:
+By default Kubernetes will allocate a port number to the app running inside the container that port is kwnon as NodePort
+NodePort will range in between 30000 to 32767
+
+Note: If you dont give node port number in the manifest file, by default Kubernetes will allocate the node port number with in the range of 30000 to 32767
+----------------------------------------------------------------------------------------------------
+practical on CLUSTERIP
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: clusterip-pod
+  labels:
+    app: clusterip-pod
+spec:
+  containers:
+  - name: clusterip-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80 
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: clusterip-service
+spec: 
+ type: ClusterIP
+ selector:
+   app: clusterip-pod
+ ports:
+ - protocol: TCP
+   port: 80
+   targetPort: 80
+
+run: kubectl apply -f clusterip.yaml 
+delete:  kubectl delete  -f clusterip.yaml
+
+but we cant access in browser 
+----------------------------------------------------------------------------------------------------
+but to access we need to use nodeport 
+
+NodePort:
+By default Kubernetes will allocate a port number to the app running inside the container that port is kwnon as NodePort
+NodePort will range in between 30000 to 32767
+
+Note: If you dont give node port number in the manifest file, by default Kubernetes will allocate the node port number with in the range of 30000 to 32767
+
+practical on NodePortip
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodeport-pod
+  labels:
+    app: nodeport-pod
+spec:
+  containers:
+  - name: nodeport-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80 
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodeport-service
+spec: 
+ type: NodePort
+ selector:
+   app: nodeport-pod
+ ports:
+ - protocol: TCP
+   port: 80
+   targetPort: 80
+   nodePort: 30080
+
+
+run: kubectl apply -f nodeport.yaml
+delete:  kubectl delete  -f nodeport.yaml
+
+
+note: we can access application in both the workersnode becaue internally k8s will route the traffice it doeset matter which node ip you give but with correct ip of worker and port number mapping we can access
+
+----------------------------------------------------------------------------------------------------
+LoadBalancer:
+
+By default, Kubernetes provides a LoadBalancer service to expose the application to external users using a cloud provider’s load balancer.
+It automatically creates an external IP address and distributes incoming traffic to the backend pods.
+LoadBalancer works by routing traffic from the external load balancer → NodePort → Pods.
+
+Automatically the load balancer will be creted in aws region
+
+practical on LoadBalancer
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: loadbalancer-pod
+  labels:
+    app: loadbalancer-pod
+spec:
+  containers:
+  - name: loadbalancer-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80 
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: loadbalancer-service
+spec: 
+ type: LoadBalancer
+ selector:
+   app: loadbalancer-pod
+ ports:
+ - protocol: TCP
+   port: 80
+   targetPort: 80
+   nodePort: 30080
+
+run: kubectl apply -f loadbalancer.yaml
+delete:  kubectl delete  -f loadbalancer.yaml
+
+
+kubectl get pod
+kubectl get svc 
+    get loadbalancer address and you can access (backend the laod balancer will be created)
+
+----------------------------------------------------------------------------------------------------
+  
+
