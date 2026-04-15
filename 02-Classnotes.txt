@@ -81,5 +81,74 @@ kubectl get svc -n dev
 everything which is created in name space will get deleted 
 
 kubectl delete ns <namespce>
+-------------------------------------------------------------------------------------------
+task 
+create name space in manifest file + deploy application using image + k8s using NodePort 
+file name  nameswiggi.yaml
+------------------------------------------------------------------
+apiVersion: v1
+kind: namespace
+metadata:
+  name: swiggi-app
+---
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: swiggi-app-pod
+  namespace: swiggi-app
+  labels:
+    app: swiggi-app
+spec:
+  containers:
+    - name: swiggi-app-container
+      image: kastrov/swiggi
+      ports:
+        - containerPort: 80 
 
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: swiggi-app-service
+  namespace: swiggi-app
+spec:
+  selector:
+    app: swiggi-app
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80 #service port
+      targetPort: 80 #container port
+      nodePort: 30080
+---------------------------Run--it------------------------------------
+
+kubectl apply -f nameswiggi.yaml
+kubectl get svc -n swiggi-app
+
+------------------------------------------------------
+Kubernetes Controllers
+
+A K8s controller will always maintain the required number of pods for your application HA(high availability) for your application
+
+desired state	- 10 pods
+actual state  - 10 pods - 5 pods + 5 pods
+
+replicas
+
+If a pod crashes, the controller notices the pods and recreates it - reconciliation
+
+Types of Controllers;
+Replication Controller
+Replica Set
+Deployment
+DaemonSet
+StatefulSet
+
+Replication Controller - RC ensures that a specified number of pod replicas are running at any given time
+If a pod fails/deletes, the RC will create a new pod to replace the deleted/failed pod
+
+kind: ReplicationController
+
+template ----> we will write pod information
