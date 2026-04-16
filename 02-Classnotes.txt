@@ -346,6 +346,87 @@ Version 1 - Zomato (Image: kastrov/Zomato:v1)
 Version 2 - Swiggy (Image: kastrov/Zomato:v2)
 
 
+------------Practicals on Simple Service Deployment---------
+04-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zomato-deployment
+  labels:
+    app: food
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: food
+  template:
+    metadata:
+      labels: 
+        app: food
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: food
+  ports:
+    - port: 80
+      targetPort: 3000
+---------------------------------------------------------------------------------------------------------------------------
+
+kubectl apply -f 04-deployment.yaml 
+kubectl get deployments 
+kubectl get deploy 
+kubectl get pods 
+
+kubectl scale deploy/zomato-deployment --replicas=10
+kubectl get pods
+kubectl scale deploy/zomato-deployment --replicas=3
+kubectl get pods
+
+kubectl describe pod -l app=food | grep -i image
+
+now change the deployment
+
+go and edit 
+dont change it  in 04-deployment.yaml --> new it's not a correct procidure 
+
+kubectl edit deploy/zomato-deployment
+before editing we can see the pods which are running are old pods
+
+image: kastrov/zomato --> image: kastrov/swiggy
+
+
+kubectl rollout history deploy/zomato-deployment
+
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         <none>
+
+kubectl annotate deployment zomato-deployment kubernetes.io/change-cause="Updated zomato to swiggy" --overwrite
+
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         Updated zomato to swiggy
+
+
+kubectl rollout history deploy/zomato-deployment
+kubectl rollout status deploy/zomato-deployment
+kubectl rollout undo deploy/zomato-deployment
+kubectl get pods
+
+-------------------------------------------blue-green deployment--------------------------------------------------------------
+
 Blue-Green Deployment
 Blue		- old version		- deployed	- users accessing blue version
 Green		- latest version	- deployed	- switch the traffic to green version
@@ -354,7 +435,153 @@ In blue green deployment the traffic switches immediately
 Blue deployment yml
 Green deployment yml
 
+Blue deployment yml --> LoadBalancer link  🔵
+Green deployment yml --> LoadBalancer link 🟢 
 
+---------------------------------------------------------------
+🔵 v2  Blue deployment yml
+   \             
+    \____________________________
+                                	\
+                                     ▶ 🌐 COMMON LB URL common service yaml file (🔵+🟢)
+                                    /
+    ______________________________
+   /                        
+🟢 v3  Green deployment yml
+----------------------------------------------------------------
+
+But if we generate like this then on production it will hamper 
+
+lets do
+
+Bluedeployment.yml  |
+Greendeployment.yml | -- CommonServiceFile.yaml 
+
+we should run all three files  
+------------------------------------------------------------------------
+Bluedeployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: blue
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo '<html><body style="background-color:skyblue;">
+            <h2>BLUE (Version 1)</h2>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g "daemon off;"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+
+
+------------------------------------------------------------------------
+Greendeployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: green
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: green
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo '<html><body style="background-color:lightgreen;">
+            <h2>GREEN (Version 2)</h2>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g "daemon off;"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+------------------------------------------------------------------------
+CommonServiceFile.yaml 
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx 
+	version: blue # -->  # ← Switch this later to "green" for release 
+  ports:
+    - port: 80
+      targetPort: 80
+------------------------------------------------------------------------
+Deployment
+
+kubectl apply -f blue-deploy.yaml
+kubectl apply -f green-deploy.yaml
+kubectl apply -f service.yaml
+
+Verification
+
+kubectl get pods
+kubectl get svc
+kubectl get endpoints nginx-lb
+
+------------------------------------------------------------------------
+If any error troubleshouting 
+
+kubectl get svc nginx-lb
+see -> EXTERNAL-IP / hostname present
+
+kubectl get endpoints nginx-lb
+------------------------------------------------------------------------
+See it live 
+
+ curl = Command Line Tool to make HTTP requests
+
+👉 watch = run command repeatedly
+👉 -n 1 = every 1 second
+
+watch -n 1 curl http://<LB-URL>
+watch -n 1 curl http://<IP-URL>
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------------
 
 
 --------------------------------------DO-Projects------------------------------------------------------------
