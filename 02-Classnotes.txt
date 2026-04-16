@@ -152,3 +152,161 @@ If a pod fails/deletes, the RC will create a new pod to replace the deleted/fail
 kind: ReplicationController
 
 template ----> we will write pod information
+------------------------------------------------------------------------------------------------------------
+02-rc.yaml
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: zomato-rc #name of the RC
+spec:
+  replicas: 2
+  selector: #it is used to identify the pod
+    app: zomato-app #it should match label of the pod
+  template:   #here we will write pod information
+    metadata:
+      name: zomato-pod  #pod name #optional
+      labels:
+        app: zomato-app
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: zomato-app
+  ports:
+    - port: 80
+      targetPort: 3000
+
+kubectl apply -f 02-rc.yml
+kubectl get pods
+kubectl get rc
+kubectl get svc  
+
+copy the dns and access the page 
+
+test High availability 
+delete pod 
+
+kubectl delete pod zomato-rc-bgjkg
+
+automatically a new pods will be apperar - no down time & high availability 
+
+How to Scale --- this is mannual scaling 
+kubectl scale rc <name-of-rc> --replicas <number>
+
+kubectl scale rc zomato-rc --replicas 6
+kubectl get pods
+
+
+------------------------------------------------------------------------------------------------------------
+
+HomeWork: Create the RC in a particular namespace
+
+------------------------------------------------------------------------------------------------------------
+Limitations of RC;
+multiple labels to the pod not allowed 
+
+v2 - currently deployed - it is not functioning
+v1 - old version
+
+Rolling Updates is not possible - RC cannot handle rolling updates , it can handel but very slow
+RC is deprecated
+
+
+Replica Set - Advanced version of RC is RS
+
+RC; --- multiple labels to the pod 
+
+  selector: #it is used to identify the pod
+    app:
+
+equality based selector
+
+------------------------------------------------------------------------------------------------------------
+
+RS;
+selector:
+	matchLabels: 
+		app: zomato-app	
+		version: v2
+		env: prod
+
+
+------------------------------------------------------------------------------------------------------------
+03.rs.yml
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: zomato-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zomato-app
+  template:
+    metadata:
+      name: zomato-pod
+      labels:
+        app: zomato-app
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: NodePort
+  selector:
+    app: zomato-app
+  ports:
+    - port: 80
+      targetPort: 3000
+      nodePort: 30000
+------------------------------------------------------------------------------------------------------------
+kubectl apply -f rs.yml
+
+kubectl get pods
+kubectl get rc
+kubectl get svc 
+
+kubectl delete -f rs.yml
+------------------------------------------------------------------------------------------------------------
+Rollout is not possible with RC & RS
+
+=> Deployment
+Roll back is possible with deployments
+Using Deployments we can manage multiple versions of the same application
+
+Types of Deployment Strategies;
+
+Rolling Update (default)	
+Recreate/Big Bang Deployment 
+Blue-Green Deployment
+Canary Deployment
+
+--------------------------------------DO-Projects------------------------------------------------------------
+Tasks:
+Zomato App: https://youtu.be/GyoI6-I68aQ?si=XILMtEdOYKUPanwq
+
+Book My Show App: https://youtu.be/hBGVwa8MY4A?si=eyFygjuDcrfJ2A4g
+
+Multibranch Job: https://youtu.be/1ecF4lKBlMo?si=qCECxLQpeyHQW6Mh
+
+GitHub Actions Project: https://youtu.be/q-eSiKqi_0o?si=LDP77YPrE8pHxIxK
+------------------------------------------------------------------------------------------------------------
