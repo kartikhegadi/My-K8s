@@ -286,6 +286,47 @@ kubectl get rc
 kubectl get svc 
 
 kubectl delete -f rs.yml
+---------------------------------------------------------------------------------------------------------------------
+seeing lables 
+kubectl get pods --show-labels
+
+scaling 
+kubectl scale rs/zomato-rs --replicas=10
+kubectl get pods
+kubectl scale rs/zomato-rs --replicas=3
+kubectl get rs
+
+----------------------------------------------------------------------------------------
+lets see 
+i want to update the image 
+at presnt we are running zomato app , i want to update it to swiggie (let's assume or else you can think like you wanna update it to updated version of zomato)
+
+lets try we will go to the file rs.yml and change the image to image: kastrov/zomato --> swiggie 
+
+kubectl create -f rs.yml
+
+if you apply it will show 
+replica set is already available, just we have change the image we cant change the application 
+
+lets see 
+kubectl apply  -f rs.yml
+it will show 
+replicaset is configured 
+service zomato unchanged 
+
+kubectl get pods
+same old pods are there nothing change.
+just we have chnaged the image the pods won't change 
+
+kubectl get pods -l app=zomato-app | grep -i image 
+
+verify 
+kubectl edit deploy/zomato-deployment  
+here we can see the name is changed 
+
+thus we can say that Rollout is not possible with RC & RS 
+
+
 ------------------------------------------------------------------------------------------------------------
 Rollout is not possible with RC & RS
 
@@ -295,10 +336,25 @@ Using Deployments we can manage multiple versions of the same application
 
 Types of Deployment Strategies;
 
-Rolling Update (default)	
-Recreate/Big Bang Deployment 
+1)Rolling Update (default)	
+2)Recreate/Big Bang Deployment 
+3)Blue-Green Deployment
+4)Canary Deployment
+
+Version 1 - Zomato (Image: kastrov/Zomato:v1)
+Version 2 - Swiggy (Image: kastrov/Zomato:v2)
+
+
 Blue-Green Deployment
-Canary Deployment
+Blue		- old version		- deployed	- users accessing blue version
+Green		- latest version	- deployed	- switch the traffic to green version
+
+In blue green deployment the traffic switches immediately
+Blue deployment yml
+Green deployment yml
+
+
+
 
 --------------------------------------DO-Projects------------------------------------------------------------
 Tasks:
