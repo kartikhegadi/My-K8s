@@ -336,10 +336,11 @@ Using Deployments we can manage multiple versions of the same application
 
 Types of Deployment Strategies;
 
-1)Rolling Update (default)	
-2)Recreate/Big Bang Deployment 
-3)Blue-Green Deployment
+1)Rolling Update (default)	 ---> delete one old pod,crete one new pod, gradually replace old pods with new pods   
+2)Recreate/Big Bang Deployment ---> delete all old pods and crete new pods 
+3)Blue-Green Deployment 
 4)Canary Deployment
+
 
 Version 1 - Zomato (Image: kastrov/Zomato:v1)
 Version 2 - Swiggy (Image: kastrov/Zomato:v2)
