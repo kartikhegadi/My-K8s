@@ -1,0 +1,530 @@
+Kubernetes_Day 03
+===================
+Tasks: 
+Ecommerce Application: https://www.youtube.com/watch?v=l-5JQcI_CH0&list=PLs-PsDpuAuTfG3gFR5DnVD58kT7JBO97x&index=3&pp=iAQB
+Microservices Project: https://www.youtube.com/watch?v=3fhvnsNY5fc&list=PLs-PsDpuAuTfG3gFR5DnVD58kT7JBO97x&index=4&pp=iAQB2AaEIw%3D%3D
+
+Canary Deployment;
+“Canary” originally comes from coal mining.
+
+🐤 Original meaning
+
+Miners used a small bird called a canary.
+
+👉 Why?
+	•	Canary is very sensitive to toxic gases
+	•	If dangerous gas appeared → canary gets affected first
+	•	So miners get an early warning and escape
+
+-------------------------------------------------------------------------------------
+🔵 STABLE (v1 - 90%)  ───────────────\
+                                      \
+                                       ▶ 🌐 LOAD BALANCER / INGRESS ▶ User Traffic
+                                      /
+🟢 CANARY (v2 - 10%) ───────────────/
+-------------------------------------------------------------------------------------
+V1
+V2
+Common Service
+
+For my app - 5 pods
+Version 1 - 4 pods
+Version 2 - 1 pod
+================
+Version 1 - 3 pods
+Version 2 - 2 pods
+================
+Version 1 - 0 pods
+Version 2 - 5 pods
+
+1️⃣ Deployment - Version 1 (Blue Page)
+📌 deployment-v1.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-v1
+spec:
+  replicas: 4 # 100% traffic initial
+  selector:
+    matchLabels:
+      app: nginx
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: v1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh"]
+        args:
+          - "-c"
+          - |
+            echo '<html><body style="background-color:blue;">
+            <h1 style="color:white;">THIS IS VERSION 1</h1>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'
+
+
+2️⃣ Deployment - Version 2 (Green Page)
+📌 deployment-v2.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-v2
+spec:
+  replicas: 1 # Start with 25% traffic
+  selector:
+    matchLabels:
+      app: nginx
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: v2
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh"]
+        args:
+          - "-c"
+          - |
+            echo '<html><body style="background-color:green;">
+            <h1 style="color:white;">THIS IS VERSION 2 (CANARY)</h1>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'
+
+
+3️⃣ LoadBalancer Service
+📌 service-lb.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx # matches both v1 + v2
+  ports:
+  - port: 80
+    targetPort: 80
+
+----------------------------------------------------------------------------------------------------------
+kubectl apply -f deployment-v1.yaml 
+kubectl apply -f deployment-v2.yaml 
+kubectl apply -f service-lb.yaml
+
+kubectl get svc
+
+Scale accordingly 
+kubectl scale deployment nginx-v1 --replicas=2
+kubectl scale deployment nginx-v2 --replicas=5
+
+kubectl scale deployment nginx-v1 --replicas=0
+kubectl scale deployment nginx-v2 --replicas=5
+
+
+----------------------------------------------------------------------------------------------------------
+VOLUMES
+
+Lets understand the scenario you have creted a manefist_file.yaml 
+in which default index file is present you have edited by entering in to the pod (exec) if you delete the pod, 
+automatically check the K8s will create the pod in which weather you are able to access the that index file ?
+go and check it?? 
+------Practicals--------------------------------------
+no-vol.yaml 
+
+apiVersion: apps/v1
+kind: Deployment  
+metadata:
+  name: nginx-no-volume
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+        ports:
+        - containerPort: 80  
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-no-volume-service
+spec:
+  type: NodePort
+  selector: 
+    app: nginx
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30000
+
+----------------------------------------------------------------------------------
+kubectl apply -f no-vol.yaml
+kubectl get svc 
+kubectl exec -it nginx-no-volume-6586c5b5fb-cc8p5  -- /bin/sh
+
+cd /usr/share/nginx/html
+echo "welcome to k8s" > hello.html 
+
+access it: http://<Pub-IP>:30000/hello.html
+
+kubectl delete  -f no-vol.yaml 
+kubectl apply -f no-vol.yaml 
+kubectl exec -it nginx-no-volume-6586c5b5fb-dp9qx  -- /bin/sh
+cd /usr/share/nginx/html
+thus we can see no file existed 
+# ls
+50x.html  index.html
+
+thus we can say data is not persistant. 
+----------------------------------------------------------------------------------
+
+K8s Volumes
+
+PV		- Persistent Volume
+PVC	- Persistent Volume Claim
+
+When you want to attach a storage to PODS, we can do it in 2 ways;
+	Static Provisioning		- manual
+	Dynamic Provisioning	- automation****
+
++----------------------+
+|         AWS          |
+|                      |
+|   +----------+       |
+|   |   PV     |       |
+|   |  10 GB   |       |
+|   +----------+       |
++----------------------+
+           │
+           ▼
+
++-----------+      +-----------+      +--------+
+|    PV     | ---> |    PVC    | ---> |  POD   |
+|  10 GB    |      |   10 GB   |      |        |
++-----------+      +-----------+      +--------+
+
+
+Storage Class
+It defines how a volume should be created dynamically - it allows dynamic provisioning of storage
+
+kubectl get sc
+NAME   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2    kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  37m
+
+Reclaim Policy (RECLAIMPOLICY)
+It defines whether you need the volume even after the pod is deleted
+
+Types;
+Retain	
+Delete
+Recycle (Deprecated)
+persistentVolumeReclaimPolicy: Retain
+
+Access Modes
+RWO (ReadWriteOnce)	- one pod on one node can read & write
+ROX (ReadOnlyMany) - multiple pods can read, none can write
+RWX (ReadWriteMany) - multiple pods can read and write the data
+
+*EBS - Volumes supports only RWO
+EFS - Volumes supports  RWX
+
+To follow above we need to Install these 
+------------------------------------------------------------------------------------------
+Install --- Why Dynamically accessing Storage that's y (CSI + IAM )
+CSI Driver - Container Storage Interface
+
+------------------------------------------------------------------------------------------
+Goal: Dynamically provision EBS volumes for a pod using a StorageClass, PVC, and Deployment. We’ll use nginx as the sample application.
+
+Pre-requisites;
+=> IAM Requirement for Worker Nodes:
+Attach AmazonEBSCSIDriverPolicy to your worker node IAM role.
+This allows Kubernetes to create, attach, detach, and delete EBS volumes dynamically.
+
+=> eksctl doesn’t know which AWS region to use. You have to explicitly set it
+eksctl utils associate-iam-oidc-provider --cluster kartik-cluster --region ap-south-1 --approve
+This allows Kubernetes service accounts to assume IAM roles (needed for CSI driver).
+
+=> Check if the EBS CSI driver pods are running:
+kubectl get pods -n kube-system | grep ebs-csi
+
+You should see pods like ebs-csi-controller-... and ebs-csi-node-... in Running state.
+If nothing appears, you need to install it.
+
+=> Install EBS CSI Driver
+Download Helm installation script (Here I will use HELM to do this)
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm version
+
+
+Add the Helm repo
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+
+helm repo update
+# This ensures Helm fetches the latest charts from the repo.
+
+helm repo list
+#You should see something like below;
+NAME                     URL
+aws-ebs-csi-driver       https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+
+Install EBS CSI driver
+helm install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver \
+    --namespace kube-system \
+    --create-namespace \
+    --set image.repository=602401143452.dkr.ecr.ap-south-1.amazonaws.com/eks/aws-ebs-csi-driver
+
+To verify that aws-ebs-csi-driver has started, run:
+
+kubectl get pod -n kube-system -l "app.kubernetes.io/name=aws-ebs-csi-driver,app.kubernetes.io/instance=aws-ebs-csi-driver"
+
+Verify installation
+kubectl get pods -n kube-system | grep ebs-csi
+#You should see controller and node pods in Running state.
+
+kubectl get pod -n kube-system -l "app.kubernetes.io/name=aws-ebs-csi-driver,app.kubernetes.io/instance=aws-ebs-csi-driver"
+
+NAME                                  READY   STATUS    RESTARTS   AGE
+ebs-csi-controller-5cfcbbf6f6-tsj5m   5/5     Running   0          3m37s
+ebs-csi-controller-67dc977479-fv9fr   4/5     Running   0          8s
+ebs-csi-controller-67dc977479-vpj5t   4/5     Running   0          8s
+ebs-csi-node-lls7s                    3/3     Running   0          5s
+ebs-csi-node-mwf45                    3/3     Running   0          8s
+root@ip-172-31-8-147:/home/ubuntu# kubectl get pods -n kube-system | grep ebs-csi
+ebs-csi-controller-67dc977479-fv9fr   5/5     Running   0          102s
+ebs-csi-controller-67dc977479-vpj5t   5/5     Running   0          102s
+ebs-csi-node-lls7s                    3/3     Running   0          99s
+ebs-csi-node-mwf45                    3/3     Running   0          102s
+
+-----------------------------Practical on Volume Persistant------------------------------------------
+
+sc.yaml
+pvc.yaml 
+deployment.yaml
+servicemanifestfile.yaml 
+
+1) sc.yaml
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc # we will mention this storage class in our PVC
+provisioner: ebs.csi.aws.com # AWS EBS CSI driver
+volumeBindingMode: WaitForFirstConsumer # Delay volume binding until a pod uses the PVC
+reclaimPolicy: Retain # Retain the volume after PVC deletion (you can also use
+#allowVolumeExpansion: true # Allow resizing of the volume after creation
+
+parameters:
+  type: gp3 # EBS volume type (gp3 is general purpose SSD)
+
+2)pvc.yaml 
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ebs-pvc # Name of the Pod YAML file
+spec:
+  accessModes:
+    - ReadWriteOnce # Access mode for the volume
+  resources:
+    requests:
+      storage: 5Gi # Requested storage size
+  storageClassName: ebs-sc # Reference to the StorageClass defined in sc.yaml
+
+3)deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-ebs
+  template:
+    metadata:
+      labels:
+        app: nginx-ebs
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: ebs-storage
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: ebs-storage
+          persistentVolumeClaim:
+            claimName: ebs-pvc
+
+
+4) servicemanifestfile.yaml 
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ebs-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-ebs
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+------------------------------------------------------------------------------------------
+
+kubectl apply -f sc.yaml 
+kubectl apply -f pvc.yaml 
+kubectl apply -f deployment.yaml 
+kubectl apply -f servicemanifestfile.yaml 
+
+kubectl get pods
+kubectl get pvc
+
+exec -it nginx-deployment-7cd76774dd-g4spb -- /bin/bash
+cd /usr/share/nginx/html/
+you will see lost+found
+
+if you try to access the default page you can't access becaue we have not written anything on the that location in deployment.yaml mountPath: /usr/share/nginx/html
+
+thuse let's see manually we will write html file and try to access
+echo "hello from ebs volume" > index.html  --- this you can directly access 
+echo "hello from ebs kartik " > index1.html --- this one you can directly access my /filename.html 
+
+boom we are able to access the page 
+
+lets we will delete pod and try to access now 
+kubectl delete pod nginx-deployment-7cd76774dd-g4spb
+
+now automatically it will heal and create the pod
+and we are able to access the date date is persistant it's fetching data from file 
+
+let's verify 
+kubectl get pods 
+exec -it nginx-deployment-7cd76774dd-8ldx6  -- /bin/bash
+cd /usr/share/nginx/html/
+root@nginx-deployment-7cd76774dd-8ldx6:/usr/share/nginx/html# ls
+index.html  index1.html  lost+found
+
+Now we will delete the persistant volume (sc.yaml) -- > then also the ebs volume will be present in aws cloud our ebs volume will be present 
+
+kubectl delete -f sc.yaml
+
+it's because of reclaimPolicy: Retain -- > untill and unless it will be there we will manually delete the volume 
+
+delete all 
+kubectl delete -f scv.yaml -f ebc.yaml -f deployment.yaml -f sc.yaml 
+------------------------------------------------------------------------------------------
+StatefulSet
+------------------------------------------------------------------------------------------
+To maintain stable identity to the pods, we will use statefulset
+This is used for database pods
+Persistent storage to the pods
+
+nginx-0
+nginx-1
+nginx-2
+
+
+3. Problem Demonstration
+deployment-mysql.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password"
+        - name: MYSQL_DATABASE
+          value: "testdb"
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-storage
+        emptyDir: {}
+
+# Apply the deployment
+kubectl apply -f deployment-mysql.yaml
+
+# Check pods
+kubectl get pods -o wide
+
+# Delete a pod and watch it get recreated with different name
+kubectl delete pod mysql-deployment-5d8b66464f-abc12
+kubectl get pods
+
+# Create the database first
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -e "CREATE DATABASE testdb;"
+
+# Now create the table in the specific database
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "CREATE TABLE test_table (id INT);"
+
+# Verify the table was created
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "SHOW TABLES;"
+
+4. Now let's demonstrate the problem with Deployment:
+# Insert some test data
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "INSERT INTO test_table VALUES (1), (2), (3);"
+
+# Verify data exists
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "SELECT * FROM test_table;"
+
+# Now delete the pod to simulate failure
+kubectl delete pod mysql-deployment-66b6d79c8-qg9hl
+
+# Wait for new pod to start
+kubectl get pods -w
+
+# Check if data persists (it won't!)
+kubectl exec -it $(kubectl get pods -l app=mysql -o jsonpath='{.items[0].metadata.name}') -- mysql -uroot -ppassword -D testdb -e "SELECT * FROM test_table;"
+
+5. Expected Output - Data Loss Demonstrated:
+The SELECT * FROM test_table; command will fail with:
+ERROR 1146 (42S02) at line 1: Table 'testdb.test_table' doesn't exist
+
+DaemonSet
+If you want only one pod on each node which is related to a specific deployment, then we will use DaemonSet
+
+
+

@@ -1,0 +1,61 @@
+Namespace + Deployment Demo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+📄 YAML (Namespace + Deployments Example)
+1️⃣ Create the Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: swiggy
+
+kubectl apply -f namespace.yaml
+
+2️⃣ Deploy the App in swiggy Namespace
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swiggy-app
+  namespace: swiggy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: swiggy-app
+  template:
+    metadata:
+      labels:
+        app: swiggy-app
+    spec:
+      containers:
+      - name: swiggy-container
+        image: kastrov/swiggy
+        ports:
+        - containerPort: 3000
+
+3️⃣ Expose the App as a Service (NodePort)
+apiVersion: v1
+kind: Service
+metadata:
+  name: swiggy-service
+  namespace: swiggy
+spec:
+  selector:
+    app: swiggy-app
+  ports:
+  - protocol: TCP
+    port: 80          # service port (inside cluster)
+    targetPort: 3000  # container port inside the pod
+    nodePort: 30000   # external port on worker node (must be between 30000–32767)
+  type: NodePort
+
+4️⃣ Verify
+# List all namespaces
+kubectl get namespaces
+
+# List deployments in swiggy namespace
+kubectl get deployments -n swiggy
+
+# List pods in swiggy namespace
+kubectl get pods -n swiggy
+
+# List services in swiggy namespace
+kubectl get svc -n swiggy
