@@ -1,0 +1,213 @@
+Kubernetes_Day 03
+===================
+Tasks: 
+Ecommerce Application: https://www.youtube.com/watch?v=l-5JQcI_CH0&list=PLs-PsDpuAuTfG3gFR5DnVD58kT7JBO97x&index=3&pp=iAQB
+Microservices Project: https://www.youtube.com/watch?v=3fhvnsNY5fc&list=PLs-PsDpuAuTfG3gFR5DnVD58kT7JBO97x&index=4&pp=iAQB2AaEIw%3D%3D
+
+Canary Deployment;
+“Canary” originally comes from coal mining.
+
+🐤 Original meaning
+
+Miners used a small bird called a canary.
+
+👉 Why?
+	•	Canary is very sensitive to toxic gases
+	•	If dangerous gas appeared → canary gets affected first
+	•	So miners get an early warning and escape
+
+-------------------------------------------------------------------------------------
+🔵 STABLE (v1 - 90%)  ───────────────\
+                                      \
+                                       ▶ 🌐 LOAD BALANCER / INGRESS ▶ User Traffic
+                                      /
+🟢 CANARY (v2 - 10%) ───────────────/
+-------------------------------------------------------------------------------------
+V1
+V2
+Common Service
+
+For my app - 5 pods
+Version 1 - 4 pods
+Version 2 - 1 pod
+================
+Version 1 - 3 pods
+Version 2 - 2 pods
+================
+Version 1 - 0 pods
+Version 2 - 5 pods
+
+1️⃣ Deployment - Version 1 (Blue Page)
+📌 deployment-v1.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-v1
+spec:
+  replicas: 4 # 100% traffic initial
+  selector:
+    matchLabels:
+      app: nginx
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: v1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh"]
+        args:
+          - "-c"
+          - |
+            echo '<html><body style="background-color:blue;">
+            <h1 style="color:white;">THIS IS VERSION 1</h1>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'
+
+
+2️⃣ Deployment - Version 2 (Green Page)
+📌 deployment-v2.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-v2
+spec:
+  replicas: 1 # Start with 25% traffic
+  selector:
+    matchLabels:
+      app: nginx
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: v2
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh"]
+        args:
+          - "-c"
+          - |
+            echo '<html><body style="background-color:green;">
+            <h1 style="color:white;">THIS IS VERSION 2 (CANARY)</h1>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'
+
+
+3️⃣ LoadBalancer Service
+📌 service-lb.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx # matches both v1 + v2
+  ports:
+  - port: 80
+    targetPort: 80
+
+----------------------------------------------------------------------------------------------------------
+kubectl apply -f deployment-v1.yaml 
+kubectl apply -f deployment-v2.yaml 
+kubectl apply -f service-lb.yaml
+
+kubectl get svc
+
+Scale accordingly 
+kubectl scale deployment nginx-v1 --replicas=2
+kubectl scale deployment nginx-v2 --replicas=5
+
+kubectl scale deployment nginx-v1 --replicas=0
+kubectl scale deployment nginx-v2 --replicas=5
+
+
+----------------------------------------------------------------------------------------------------------
+VOLUMES
+
+Lets understand the scenario you have creted a manefist_file.yaml 
+in which default index file is present you have edited by entering in to the pod (exec) if you delete the pod, 
+automatically check the K8s will create the pod in which weather you are able to access the that index file ?
+go and check it?? 
+------Practicals--------------------------------------
+no-vol.yaml 
+
+apiVersion: apps/v1
+kind: Deployment  
+metadata:
+  name: nginx-no-volume
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+        ports:
+        - containerPort: 80  
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-no-volume-service
+spec:
+  type: NodePort
+  selector: 
+    app: nginx
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30000
+
+----------------------------------------------------------------------------------
+kubectl apply -f no-vol.yaml
+kubectl get svc 
+kubectl exec -it nginx-no-volume-6586c5b5fb-cc8p5  -- /bin/sh
+
+cd /usr/share/nginx/html
+echo "welcome to k8s" > hello.html 
+
+access it: http://<Pub-IP>:30000/hello.html
+
+kubectl delete  -f no-vol.yaml 
+kubectl apply -f no-vol.yaml 
+kubectl exec -it nginx-no-volume-6586c5b5fb-dp9qx  -- /bin/sh
+cd /usr/share/nginx/html
+thus we can see no file existed 
+# ls
+50x.html  index.html
+
+thus we can say data is not persistant. 
+----------------------------------------------------------------------------------
+
+K8s Volumes
+
+PV		- Persistent Volume
+PVC	- Persistent Volume Claim
+
+
+
+
+
+
+
+
+
