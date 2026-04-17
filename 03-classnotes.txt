@@ -440,7 +440,91 @@ it's because of reclaimPolicy: Retain -- > untill and unless it will be there we
 delete all 
 kubectl delete -f scv.yaml -f ebc.yaml -f deployment.yaml -f sc.yaml 
 ------------------------------------------------------------------------------------------
+StatefulSet
+------------------------------------------------------------------------------------------
+To maintain stable identity to the pods, we will use statefulset
+This is used for database pods
+Persistent storage to the pods
 
+nginx-0
+nginx-1
+nginx-2
+
+
+3. Problem Demonstration
+deployment-mysql.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password"
+        - name: MYSQL_DATABASE
+          value: "testdb"
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-storage
+        emptyDir: {}
+
+# Apply the deployment
+kubectl apply -f deployment-mysql.yaml
+
+# Check pods
+kubectl get pods -o wide
+
+# Delete a pod and watch it get recreated with different name
+kubectl delete pod mysql-deployment-5d8b66464f-abc12
+kubectl get pods
+
+# Create the database first
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -e "CREATE DATABASE testdb;"
+
+# Now create the table in the specific database
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "CREATE TABLE test_table (id INT);"
+
+# Verify the table was created
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "SHOW TABLES;"
+
+4. Now let's demonstrate the problem with Deployment:
+# Insert some test data
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "INSERT INTO test_table VALUES (1), (2), (3);"
+
+# Verify data exists
+kubectl exec -it mysql-deployment-66b6d79c8-qg9hl -- mysql -uroot -ppassword -D testdb -e "SELECT * FROM test_table;"
+
+# Now delete the pod to simulate failure
+kubectl delete pod mysql-deployment-66b6d79c8-qg9hl
+
+# Wait for new pod to start
+kubectl get pods -w
+
+# Check if data persists (it won't!)
+kubectl exec -it $(kubectl get pods -l app=mysql -o jsonpath='{.items[0].metadata.name}') -- mysql -uroot -ppassword -D testdb -e "SELECT * FROM test_table;"
+
+5. Expected Output - Data Loss Demonstrated:
+The SELECT * FROM test_table; command will fail with:
+ERROR 1146 (42S02) at line 1: Table 'testdb.test_table' doesn't exist
+
+DaemonSet
+If you want only one pod on each node which is related to a specific deployment, then we will use DaemonSet
 
 
 
