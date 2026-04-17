@@ -316,6 +316,126 @@ ebs-csi-controller-67dc977479-vpj5t   5/5     Running   0          102s
 ebs-csi-node-lls7s                    3/3     Running   0          99s
 ebs-csi-node-mwf45                    3/3     Running   0          102s
 
+-----------------------------Practical on Volume Persistant------------------------------------------
+
+sc.yaml
+pvc.yaml 
+deployment.yaml
+servicemanifestfile.yaml 
+
+1) sc.yaml
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc # we will mention this storage class in our PVC
+provisioner: ebs.csi.aws.com # AWS EBS CSI driver
+volumeBindingMode: WaitForFirstConsumer # Delay volume binding until a pod uses the PVC
+reclaimPolicy: Retain # Retain the volume after PVC deletion (you can also use
+#allowVolumeExpansion: true # Allow resizing of the volume after creation
+
+parameters:
+  type: gp3 # EBS volume type (gp3 is general purpose SSD)
+
+2)pvc.yaml 
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ebs-pvc # Name of the Pod YAML file
+spec:
+  accessModes:
+    - ReadWriteOnce # Access mode for the volume
+  resources:
+    requests:
+      storage: 5Gi # Requested storage size
+  storageClassName: ebs-sc # Reference to the StorageClass defined in sc.yaml
+
+3)deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-ebs
+  template:
+    metadata:
+      labels:
+        app: nginx-ebs
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: ebs-storage
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: ebs-storage
+          persistentVolumeClaim:
+            claimName: ebs-pvc
+
+
+4) servicemanifestfile.yaml 
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ebs-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-ebs
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+------------------------------------------------------------------------------------------
+
+kubectl apply -f sc.yaml 
+kubectl apply -f pvc.yaml 
+kubectl apply -f deployment.yaml 
+kubectl apply -f servicemanifestfile.yaml 
+
+kubectl get pods
+kubectl get pvc
+
+exec -it nginx-deployment-7cd76774dd-g4spb -- /bin/bash
+cd /usr/share/nginx/html/
+you will see lost+found
+
+if you try to access the default page you can't access becaue we have not written anything on the that location in deployment.yaml mountPath: /usr/share/nginx/html
+
+thuse let's see manually we will write html file and try to access
+echo "hello from ebs volume" > index.html  --- this you can directly access 
+echo "hello from ebs kartik " > index1.html --- this one you can directly access my /filename.html 
+
+boom we are able to access the page 
+
+lets we will delete pod and try to access now 
+kubectl delete pod nginx-deployment-7cd76774dd-g4spb
+
+now automatically it will heal and create the pod
+and we are able to access the date date is persistant it's fetching data from file 
+
+let's verify 
+kubectl get pods 
+exec -it nginx-deployment-7cd76774dd-8ldx6  -- /bin/bash
+cd /usr/share/nginx/html/
+root@nginx-deployment-7cd76774dd-8ldx6:/usr/share/nginx/html# ls
+index.html  index1.html  lost+found
+
+
+
+
+------------------------------------------------------------------------------------------
+
 
 
 
