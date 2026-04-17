@@ -1,0 +1,757 @@
+================================================================================
+  AWS EFS + EKS: COMPLETE DEEP-DIVE GUIDE
+  A production-ready reference for setting up Amazon Elastic File System (EFS)
+  with Amazon Elastic Kubernetes Service (EKS)
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+ 1. What is This?
+ 2. Core Concepts Explained
+ 3. Architecture Overview
+ 4. Why Use EFS with EKS?
+ 5. Advantages & Disadvantages
+ 6. Real-World Scenario
+ 7. Step-by-Step Setup Guide
+ 8. How Data Flows
+ 9. EFS vs Other Storage Options
+10. Security Best Practices
+11. Troubleshooting
+12. Summary Cheatsheet
+
+
+================================================================================
+1. WHAT IS THIS?
+================================================================================
+
+This guide covers the complete integration of Amazon EFS (Elastic File System)
+with Amazon EKS (Elastic Kubernetes Service). In plain terms:
+
+  Component         What it is                              Analogy
+  -----------------------------------------------------------------------
+  EKS               Managed Kubernetes - runs your          A smart factory
+                    containerized apps                       that runs your apps
+
+  EFS               Managed NFS file storage - shared,      A shared hard drive
+                    scalable, persistent                     in the cloud
+
+  EFS CSI Driver    A Kubernetes plugin that connects        A USB driver that
+                    EFS to your pods                         lets the factory
+                                                             use the hard drive
+
+  Mount Target      An NFS endpoint inside each             The physical socket
+                    Availability Zone                        in each building
+
+  Security Group    A firewall that controls network         A security guard
+                    access                                   checking who enters
+
+
+================================================================================
+2. CORE CONCEPTS EXPLAINED
+================================================================================
+
+AMAZON EFS (Elastic File System)
+---------------------------------
+EFS is a fully managed, serverless, elastic NFS (Network File System) provided
+by AWS. Unlike a traditional hard drive, EFS:
+  - Automatically grows and shrinks as you add/remove files
+  - Is accessible from multiple instances simultaneously (ReadWriteMany)
+  - Survives across Availability Zones - highly available by design
+  - Charges only for what you use - no pre-provisioning needed
+
+AMAZON EKS (Elastic Kubernetes Service)
+-----------------------------------------
+EKS is AWS's managed Kubernetes service. Kubernetes (K8s) is an orchestration
+platform that:
+  - Runs your applications in containers (Docker)
+  - Automatically scales, restarts, and balances your workloads
+  - Uses Pods as the smallest unit (a pod = one or more containers)
+  - Uses Persistent Volume Claims (PVCs) to request storage
+
+WHY PODS NEED PERSISTENT STORAGE
+----------------------------------
+By default, containers are ephemeral - when a pod dies, its data is gone.
+For stateful workloads (databases, CMS, ML models, shared configs), you need
+storage that:
+  - Persists beyond pod restarts          [YES - EFS handles this]
+  - Is accessible to multiple pods        [YES - EFS handles this]
+  - Is managed outside Kubernetes         [YES - EFS handles this]
+
+EFS fulfills all three.
+
+CSI DRIVER (Container Storage Interface)
+-----------------------------------------
+The EFS CSI Driver is a Kubernetes-native plugin that:
+  - Translates Kubernetes storage requests (PVC) into EFS API calls
+  - Mounts EFS volumes into pods transparently
+  - Is maintained by AWS and installed via Helm
+
+
+================================================================================
+3. ARCHITECTURE OVERVIEW
+================================================================================
+
+AWS CLOUD LAYOUT
+-----------------
+
+  +------------------------------------------------------------------+
+  |                        AWS Cloud                                  |
+  |  +------------------------------------------------------------+  |
+  |  |                  VPC (Virtual Private Cloud)                |  |
+  |  |                                                              |  |
+  |  |  +----------------------+    +------------------------+     |  |
+  |  |  |  Availability Zone A |    |  Availability Zone B   |     |  |
+  |  |  |                      |    |                         |     |  |
+  |  |  |  +-----------------+ |    |  +------------------+   |     |  |
+  |  |  |  |  EKS Node 1     | |    |  |  EKS Node 2      |   |     |  |
+  |  |  |  |  [ Pod A ]      | |    |  |  [ Pod B ]       |   |     |  |
+  |  |  |  |  [ Pod B ]      | |    |  |  [ Pod C ]       |   |     |  |
+  |  |  |  +-------+---------+ |    |  +--------+---------+   |     |  |
+  |  |  |          |            |    |           |              |     |  |
+  |  |  |  +-------v----------+|    |  +---------v-----------+ |     |  |
+  |  |  |  | EFS Mount Target ||    |  | EFS Mount Target    | |     |  |
+  |  |  |  | (AZ-A endpoint)  ||    |  | (AZ-B endpoint)     | |     |  |
+  |  |  |  +------------------+|    |  +---------------------+ |     |  |
+  |  |  +----------------------+    +-------------------------+ |     |  |
+  |  |                                                           |     |  |
+  |  |              +-------------------------+                  |     |  |
+  |  |              |    Amazon EFS           |                  |     |  |
+  |  |              |    (Shared Storage)     |                  |     |  |
+  |  |              |    fs-xxxxxxxxxx        |                  |     |  |
+  |  |              +-------------------------+                  |     |  |
+  |  +------------------------------------------------------------+  |
+  +------------------------------------------------------------------+
+
+KUBERNETES LAYER DETAIL
+------------------------
+
+  Pod  --requests-->  PVC  --bound to-->  PV  --maps to-->  EFS
+ (app)              (claim)            (volume)          (storage)
+
+  PVC = "I need 20Gi of ReadWriteMany storage"
+  PV  = "Here is 20Gi backed by EFS fs-xxxxxxxx"
+
+
+================================================================================
+4. WHY USE EFS WITH EKS?
+================================================================================
+
+THE CORE PROBLEM EFS SOLVES
+-----------------------------
+In Kubernetes, pods are stateless and replaceable. When you scale horizontally
+(multiple replicas), each pod runs on a different node in a different AZ.
+Traditional block storage (like EBS) is:
+  - Tied to a single AZ - cannot be shared
+  - Only mounted by one node at a time - no ReadWriteMany
+  - Not suitable for shared data across replicas
+
+EFS solves all of this:
+
+  WITHOUT EFS:                       WITH EFS:
+
+  Pod-1 --> EBS-1 (AZ-A) [isolated]  Pod-1 --+
+  Pod-2 --> EBS-2 (AZ-B) [isolated]  Pod-2 --+--> EFS (any AZ) [SHARED]
+  Pod-3 --> EBS-3 (AZ-C) [isolated]  Pod-3 --+
+
+  Each pod has isolated storage!     All pods share one filesystem!
+
+
+================================================================================
+5. ADVANTAGES & DISADVANTAGES
+================================================================================
+
+ADVANTAGES
+-----------
+  #   Advantage              Details
+  -----------------------------------------------------------------------
+  1   ReadWriteMany (RWX)    Multiple pods across nodes/AZs can read and
+                             write simultaneously - impossible with EBS
+
+  2   Fully Managed          No OS patching, no capacity planning, no NFS
+                             server to maintain
+
+  3   Elastic Scaling        Auto-grows/shrinks from KB to petabytes;
+                             pay only for what you use
+
+  4   High Availability      Data stored across multiple AZs by default
+
+  5   Durable                99.999999999% (11 nines) durability
+
+  6   POSIX Compliant        Standard filesystem semantics - apps that work
+                             with local files work with EFS
+
+  7   Access Points          Fine-grained access control per directory
+                             per application
+
+  8   Lifecycle Management   Automatically move infrequent files to cheaper
+                             IA (Infrequent Access) storage tier
+
+  9   Encryption             At-rest and in-transit encryption built-in
+
+  10  IAM Integration        Enforce AWS IAM policies at file system level
+
+
+DISADVANTAGES
+--------------
+  #   Disadvantage           Details
+  -----------------------------------------------------------------------
+  1   Cost                   ~3x more expensive than EBS per GB; not ideal
+                             for high-volume block I/O
+
+  2   Latency                Higher latency than EBS (network-based NFS vs
+                             local block); not suitable for latency-sensitive
+                             databases
+
+  3   Throughput Limits      Bursting mode has limits; need provisioned
+                             throughput for sustained high I/O
+
+  4   Not for Databases      MySQL, PostgreSQL need block storage (EBS);
+                             NFS semantics aren't optimized for DB workloads
+
+  5   Cold Start             First access after long idle can be slower
+                             due to NFS caching behavior
+
+  6   Complexity             Requires Security Groups, Mount Targets per AZ,
+                             and CSI Driver installation - more setup than EBS
+
+  7   No Windows Support     NFS protocol - Linux-only workloads
+
+  8   Network Dependency     Performance depends on VPC network quality
+
+
+================================================================================
+6. REAL-WORLD SCENARIO
+================================================================================
+
+SCENARIO: SHARED CMS ON EKS
+-----------------------------
+Company: An e-commerce platform using WordPress deployed on EKS with 3 replicas.
+
+PROBLEM WITHOUT EFS:
+
+  Replica-1 (AZ-A): User uploads product image
+                    --> saved to /uploads on local pod storage
+  Replica-2 (AZ-B): Next request hits this pod
+                    --> /uploads is EMPTY --> image not found! [BROKEN]
+  Replica-3 (AZ-C): Same problem
+                    --> each pod has its own isolated storage
+
+SOLUTION WITH EFS:
+
+  Replica-1, 2, 3 all mount the SAME EFS volume at /uploads
+  User uploads image via Replica-1 --> saved to EFS
+  Next request hits Replica-2 --> reads from same EFS --> image found! [WORKS]
+
+REAL ARCHITECTURE:
+
+  +----------------------------------------------------------+
+  |  WordPress EKS Deployment (3 replicas)                   |
+  |                                                           |
+  |  +-------------+  +-------------+  +-------------+       |
+  |  | WP Pod 1    |  | WP Pod 2    |  | WP Pod 3    |       |
+  |  | (AZ-A)      |  | (AZ-B)      |  | (AZ-C)      |       |
+  |  |             |  |             |  |             |       |
+  |  | /uploads/   |  | /uploads/   |  | /uploads/   |       |
+  |  +------+------+  +------+------+  +------+------+       |
+  |         |                |                |               |
+  |         +----------------+----------------+               |
+  |                          |                                 |
+  |                   +------v------+                          |
+  |                   |  EFS PVC    |                          |
+  |                   |  (RWX)      |                          |
+  |                   +------+------+                          |
+  |                          |                                 |
+  |                   +------v------+                          |
+  |                   | Amazon EFS  |                          |
+  |                   | fs-xxxxx    |                          |
+  |                   |             |                          |
+  |                   | /uploads/   |                          |
+  |                   |  img1.jpg   |                          |
+  |                   |  img2.png   |                          |
+  |                   +-------------+                          |
+  +----------------------------------------------------------+
+
+OTHER REAL-WORLD USE CASES:
+
+  Use Case               Why EFS
+  -----------------------------------------------------------------------
+  ML Model Serving       Multiple inference pods read the same model weights
+  CI/CD Build Cache      Build agents share cache across parallel jobs
+  Log Aggregation        Multiple app pods write logs to a shared directory
+  Config Management      All pods read the same config files
+  Media Processing       Upload pod writes, transcoding pods read same file
+  Jupyter Notebooks      Data scientists share datasets across notebook pods
+
+
+================================================================================
+7. STEP-BY-STEP SETUP GUIDE
+================================================================================
+
+PREREQUISITES CHECKLIST
+-------------------------
+  [ ] AWS CLI installed and configured
+  [ ] kubectl configured to connect to your EKS cluster
+  [ ] Helm 3.x installed
+  [ ] Worker node subnet IDs ready
+  [ ] EKS worker node IAM role has EFS permissions
+
+
+STEP 0: CHECK POD VOLUME ASSIGNMENTS
+--------------------------------------
+Before anything, understand which pods use which volumes:
+
+  kubectl get pod -o custom-columns=\
+  NAME:.metadata.name,\
+  STATUS:.status.phase,\
+  VOLUME:.spec.volumes[*].persistentVolumeClaim.claimName
+
+Expected output:
+  NAME           STATUS    VOLUME
+  webapp-pod-1   Running   webapp-pvc
+  webapp-pod-2   Running   webapp-pvc   <-- Same PVC = shared storage
+  webapp-pod-3   Running   webapp-pvc
+
+
+STEP 1: GET VPC ID
+-------------------
+Your EKS nodes run inside a VPC. EFS must be created in the same VPC.
+
+  VPC_ID=$(aws ec2 describe-subnets \
+    --subnet-ids <Node1-SubnetID> \
+    --query "Subnets[0].VpcId" \
+    --output text)
+
+  echo "VPC ID: $VPC_ID"
+
+TIP: Get your subnet IDs from:
+  kubectl get nodes -o jsonpath='{.items[*].spec.providerID}'
+  aws ec2 describe-instances --instance-ids <id> \
+    --query 'Reservations[0].Instances[0].SubnetId'
+
+
+STEP 2: CREATE SECURITY GROUP FOR EFS
+---------------------------------------
+A dedicated security group controls who can connect to EFS.
+
+  EFS_SG_ID=$(aws ec2 create-security-group \
+    --group-name efs-sg \
+    --description "Security group for EFS access from EKS" \
+    --vpc-id $VPC_ID \
+    --query "GroupId" \
+    --output text)
+
+  echo "Security Group ID: $EFS_SG_ID"
+
+Allow NFS traffic (Port 2049):
+
+  # DEV/TESTING ONLY - open to all
+  aws ec2 authorize-security-group-ingress \
+    --group-id $EFS_SG_ID \
+    --protocol tcp \
+    --port 2049 \
+    --cidr 0.0.0.0/0
+
+  # PRODUCTION - restrict to EKS node security group only
+  aws ec2 authorize-security-group-ingress \
+    --group-id $EFS_SG_ID \
+    --protocol tcp \
+    --port 2049 \
+    --source-group <EKS-Node-Security-Group-ID>
+
+Security Group Flow:
+  EKS Nodes (sg-nodes) --port 2049--> EFS SG (sg-efs) --> EFS File System
+        ^
+   Only this is allowed in production
+
+
+STEP 3: CREATE EFS FILE SYSTEM
+--------------------------------
+
+  EFS_ID=$(aws efs create-file-system \
+    --creation-token kastro-efs-$(date +%s) \
+    --performance-mode generalPurpose \
+    --throughput-mode bursting \
+    --encrypted \
+    --tags Key=Name,Value=kastro-eks-efs \
+    --query "FileSystemId" \
+    --output text)
+
+  echo "EFS File System ID: $EFS_ID"
+
+Performance Mode Options:
+  generalPurpose   Web apps, CMS, CI/CD          Max 35,000 IOPS
+  maxIO            Big data, media, ML            Unlimited IOPS
+
+Throughput Mode Options:
+  bursting         Variable workloads             Pay per GB stored
+  provisioned      Sustained high throughput      Pay per MB/s provisioned
+  elastic          Unpredictable, spiky           Pay per GB transferred
+
+
+STEP 4: CREATE MOUNT TARGETS (ONE PER AZ)
+------------------------------------------
+Mount targets are the NFS endpoints inside each AZ. Pods in AZ-A use the
+AZ-A mount target - this reduces latency and cross-AZ transfer costs.
+
+  NODE1_SUBNET="subnet-xxxxxxxx"   # AZ-A
+  NODE2_SUBNET="subnet-yyyyyyyy"   # AZ-B
+
+  # Mount Target for AZ-A
+  aws efs create-mount-target \
+    --file-system-id $EFS_ID \
+    --subnet-id $NODE1_SUBNET \
+    --security-groups $EFS_SG_ID
+
+  # Mount Target for AZ-B
+  aws efs create-mount-target \
+    --file-system-id $EFS_ID \
+    --subnet-id $NODE2_SUBNET \
+    --security-groups $EFS_SG_ID
+
+Mount Target Topology:
+
+           EFS File System (fs-xxxxxxxx)
+                      |
+         +------------+------------+
+         |            |            |
+   Mount Target  Mount Target  Mount Target
+      AZ-A          AZ-B          AZ-C
+    10.0.1.x     10.0.2.x      10.0.3.x
+         |            |            |
+   EKS Node 1  EKS Node 2  EKS Node 3
+   (Pods here) (Pods here) (Pods here)
+
+WARNING: Without a mount target in an AZ, pods on nodes in that AZ CANNOT
+access EFS. Always create one per AZ your nodes run in.
+
+
+STEP 5: VERIFY MOUNT TARGETS
+------------------------------
+
+  aws efs describe-mount-targets \
+    --file-system-id $EFS_ID \
+    --query "MountTargets[*].{AZ:AvailabilityZoneName,IP:IpAddress,State:LifeCycleState}"
+
+Expected output:
+  [
+    {
+      "AZ": "ap-south-1a",
+      "IP": "10.0.1.45",
+      "State": "available"
+    },
+    {
+      "AZ": "ap-south-1b",
+      "IP": "10.0.2.67",
+      "State": "available"
+    }
+  ]
+
+Wait until State = "available" before proceeding.
+
+
+STEP 6: INSTALL EFS CSI DRIVER VIA HELM
+-----------------------------------------
+The CSI driver is the bridge between Kubernetes and EFS.
+
+  helm repo add aws-efs-csi-driver \
+    https://kubernetes-sigs.github.io/aws-efs-csi-driver/
+
+  helm repo update
+
+  helm install aws-efs-csi-driver \
+    aws-efs-csi-driver/aws-efs-csi-driver \
+    --namespace kube-system \
+    --set image.repository=602401143452.dkr.ecr.ap-south-1.amazonaws.com/eks/aws-efs-csi-driver
+
+NOTE: Replace ap-south-1 with your AWS region.
+
+Verify installation:
+  kubectl get pods -n kube-system | grep efs-csi
+
+Expected output:
+  efs-csi-controller-xxxx   3/3   Running   0   2m
+  efs-csi-node-xxxxx        3/3   Running   0   2m   <-- One per node
+  efs-csi-node-yyyyy        3/3   Running   0   2m
+
+
+STEP 7: CREATE STORAGECLASS
+-----------------------------
+Save the following as efs-storageclass.yaml:
+
+  apiVersion: storage.k8s.io/v1
+  kind: StorageClass
+  metadata:
+    name: efs-sc
+  provisioner: efs.csi.aws.com
+  parameters:
+    provisioningMode: efs-ap
+    fileSystemId: fs-xxxxxxxxxx   # Your EFS ID
+    directoryPerms: "700"
+    gidRangeStart: "1000"
+    gidRangeEnd: "2000"
+  reclaimPolicy: Retain
+  volumeBindingMode: Immediate
+
+Apply:
+  kubectl apply -f efs-storageclass.yaml
+
+
+STEP 8: CREATE PVC AND DEPLOY PODS
+------------------------------------
+Save as efs-pvc.yaml:
+
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: efs-claim
+  spec:
+    accessModes:
+      - ReadWriteMany         # Key difference from EBS (ReadWriteOnce)
+    storageClassName: efs-sc
+    resources:
+      requests:
+        storage: 5Gi          # EFS ignores this - it's elastic; placeholder
+
+Save as efs-deployment.yaml:
+
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: webapp
+  spec:
+    replicas: 3
+    selector:
+      matchLabels:
+        app: webapp
+    template:
+      metadata:
+        labels:
+          app: webapp
+      spec:
+        containers:
+        - name: webapp
+          image: nginx
+          volumeMounts:
+          - name: persistent-storage
+            mountPath: /usr/share/nginx/html
+        volumes:
+        - name: persistent-storage
+          persistentVolumeClaim:
+            claimName: efs-claim
+
+Apply:
+  kubectl apply -f efs-pvc.yaml
+  kubectl apply -f efs-deployment.yaml
+  kubectl get pvc      # Should show STATUS: Bound
+  kubectl get pods     # All 3 replicas Running
+
+
+================================================================================
+8. HOW DATA FLOWS
+================================================================================
+
+  User Request
+       |
+       v
+  +-----------------------------------------------------------+
+  | Step 1: Pod makes a filesystem call                        |
+  | (e.g., open("/data/file.txt", "w"))                       |
+  +---------------------------+-------------------------------+
+                              |
+                              v
+  +-----------------------------------------------------------+
+  | Step 2: Linux kernel routes to NFS client                  |
+  | (EFS CSI driver mounted EFS via NFS v4.1 protocol)        |
+  +---------------------------+-------------------------------+
+                              |
+                              v
+  +-----------------------------------------------------------+
+  | Step 3: NFS request goes to EFS Mount Target              |
+  | (the endpoint in the same AZ as the node)                 |
+  +---------------------------+-------------------------------+
+                              |
+                              v
+  +-----------------------------------------------------------+
+  | Step 4: EFS stores data across multiple AZs               |
+  | (data is replicated internally for durability)             |
+  +-----------------------------------------------------------+
+
+Complete path:
+  Pod --> Node --> Mount Target (same AZ) --> EFS Backend (multi-AZ)
+
+
+================================================================================
+9. EFS vs OTHER STORAGE OPTIONS
+================================================================================
+
+  Feature          EFS          EBS          S3           FSx for Lustre
+  -----------------------------------------------------------------------
+  Type             NFS          Block        Object       Parallel FS
+  Access           RWX          RWO          HTTP API     RWX
+  Multi-AZ         Yes          No           Yes          Yes
+  Protocol         NFS v4       iSCSI        REST         Lustre
+  Latency          ~1-3ms       ~0.1ms       ~50-100ms    <1ms
+  Kubernetes RWX   Yes          No           Via driver   Yes
+  Price (per GB)   ~$0.30       ~$0.10       ~$0.023      ~$0.14
+  Best For         Shared files Databases    Backups      HPC / ML
+
+WHEN TO CHOOSE WHAT:
+
+  Need shared storage across pods?       --> EFS
+  Running a database (MySQL, Postgres)?  --> EBS
+  Storing static assets, backups?        --> S3
+  ML training, HPC workloads?            --> FSx for Lustre
+
+
+================================================================================
+10. SECURITY BEST PRACTICES
+================================================================================
+
+1. RESTRICT SECURITY GROUP
+   BAD:  --cidr 0.0.0.0/0
+   GOOD: --source-group <EKS-Node-SG-ID>
+
+2. ENABLE ENCRYPTION
+   At-rest encryption (add to create-file-system):
+     --encrypted \
+     --kms-key-id arn:aws:kms:region:account:key/key-id
+
+   In-transit: handled automatically by EFS CSI driver with TLS
+
+3. USE EFS ACCESS POINTS
+   Access Points create isolated directory views per application:
+
+   EFS Root (/)
+   +-- /app1/     <-- Access Point for App 1 (uid:1000)
+   +-- /app2/     <-- Access Point for App 2 (uid:2000)
+   +-- /shared/   <-- Shared between all
+
+   In StorageClass parameters:
+     provisioningMode: efs-ap
+     fileSystemId: fs-xxxxxxxx
+     directoryPerms: "700"
+     uid: "1000"
+     gid: "1000"
+
+4. IAM POLICIES FOR EKS NODES
+   Ensure your node IAM role has these permissions:
+
+   {
+     "Effect": "Allow",
+     "Action": [
+       "elasticfilesystem:DescribeAccessPoints",
+       "elasticfilesystem:DescribeFileSystems",
+       "elasticfilesystem:DescribeMountTargets",
+       "elasticfilesystem:CreateAccessPoint",
+       "elasticfilesystem:DeleteAccessPoint",
+       "ec2:DescribeAvailabilityZones"
+     ],
+     "Resource": "*"
+   }
+
+
+================================================================================
+11. TROUBLESHOOTING
+================================================================================
+
+POD STUCK IN "PENDING" - PVC NOT BOUND
+----------------------------------------
+Run these to diagnose:
+  kubectl describe pvc efs-claim
+  kubectl describe pod <pod-name>
+
+Common causes and fixes:
+  Symptom                       Likely Cause                Fix
+  -----------------------------------------------------------------------
+  "no nodes available"          CSI node pod not running    Check:
+                                                            kubectl get pods
+                                                            -n kube-system
+                                                            | grep efs
+
+  "AccessDenied"                IAM permissions missing     Attach EFS policy
+                                                            to node role
+
+  "timeout"                     Security group              Verify port 2049
+                                misconfigured               is open
+
+  "mount.nfs: Connection        No mount target in          Create mount target
+   refused"                     node's AZ                   in that AZ
+
+
+CHECK CSI DRIVER LOGS
+----------------------
+  # Controller logs (scheduling, provisioning)
+  kubectl logs -n kube-system deployment/efs-csi-controller -c csi-provisioner
+
+  # Node logs (actual mounting)
+  kubectl logs -n kube-system daemonset/efs-csi-node -c efs-plugin
+
+
+TEST EFS CONNECTIVITY FROM A POD
+----------------------------------
+  kubectl run test-pod --image=amazonlinux --restart=Never -- sleep 3600
+  kubectl exec -it test-pod -- bash
+
+  # Inside pod:
+  mount | grep nfs              # Should show EFS mount
+  df -h                         # Should show EFS filesystem
+  echo "test" > /data/test.txt  # Write test
+  cat /data/test.txt            # Read back
+
+
+================================================================================
+12. SUMMARY CHEATSHEET
+================================================================================
+
+SETUP FLOW:
+  1. Get VPC ID            --> All resources must be in same VPC
+  2. Create Security Group --> Allow port 2049 (NFS) from EKS nodes
+  3. Create EFS            --> The actual shared filesystem
+  4. Create Mount Targets  --> One per AZ (entry points for NFS)
+  5. Verify Mount Targets  --> Wait for "available" state
+  6. Install CSI Driver    --> Kubernetes <--> EFS bridge (via Helm)
+  7. Create StorageClass   --> Tell K8s how to provision EFS volumes
+  8. Create PVC            --> Request storage (ReadWriteMany)
+  9. Deploy Pods           --> Mount PVC; all pods share one EFS
+
+KEY PORTS & PROTOCOLS:
+  NFS v4.1:  Port 2049 (TCP)
+  TLS wrap:  Handled by EFS CSI driver automatically
+
+KEY IDs TO SAVE:
+  VPC_ID      = vpc-xxxxxxxxxxxxxxxxx
+  EFS_SG_ID   = sg-xxxxxxxxxxxxxxxxx
+  EFS_ID      = fs-xxxxxxxxxx
+
+ACCESS MODES COMPARISON:
+  ReadWriteOnce (RWO)  --> EBS  --> 1 pod on 1 node only
+  ReadWriteMany (RWX)  --> EFS  --> Many pods on many nodes [WHAT WE WANT]
+  ReadOnlyMany  (ROX)  --> EFS  --> Many pods, read-only
+
+QUICK VERIFY COMMANDS:
+  kubectl get pvc                              # Check PVC is Bound
+  kubectl get pods -n kube-system | grep efs  # Check CSI driver running
+  aws efs describe-mount-targets \
+    --file-system-id <fs-id>                  # Check mount targets available
+  kubectl describe pod <pod-name>             # Debug pod issues
+
+
+================================================================================
+FURTHER READING
+================================================================================
+  - AWS EFS Documentation:
+    https://docs.aws.amazon.com/efs/latest/ug/
+
+  - EFS CSI Driver GitHub:
+    https://github.com/kubernetes-sigs/aws-efs-csi-driver
+
+  - Amazon EKS Storage Best Practices:
+    https://aws.github.io/aws-eks-best-practices/storage/
+
+  - EFS Performance Guide:
+    https://docs.aws.amazon.com/efs/latest/ug/performance.html
+
+================================================================================
+  Guide authored for production EKS deployments.
+  Always test in a staging environment before applying to production.
+================================================================================
