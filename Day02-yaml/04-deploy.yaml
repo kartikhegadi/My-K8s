@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zomato-deployment
+  labels:
+    app: food
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: food
+  template:
+    metadata:
+      labels: 
+        app: food
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: food
+  ports:
+    - port: 80
+      targetPort: 3000

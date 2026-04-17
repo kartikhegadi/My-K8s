@@ -1,0 +1,13 @@
+# single-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: single-pod
+  labels:
+    app: single-pod
+spec:
+  containers:
+    - name: single-pod-container
+      image: nginx:latest
+      ports:
+        - containerPort: 80

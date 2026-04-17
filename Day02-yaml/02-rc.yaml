@@ -1,0 +1,32 @@
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: zomato-rc #name of the RC
+spec:
+  replicas: 2
+  selector: #it is used to identify the pod
+    app: zomato-app #it should match label of the pod
+  template:   #here we will write pod information
+    metadata:
+      name: zomato-pod  #pod name #optional
+      labels:
+        app: zomato-app
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: zomato-app
+  ports:
+    - port: 80
+      targetPort: 3000

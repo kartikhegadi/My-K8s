@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: green
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: green
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              echo '<html><body style="background-color:lightgreen;">
+              <h2>GREEN (Version 2)</h2>
+              </body></html>' > /usr/share/nginx/html/index.html && nginx -g "daemon off;"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
