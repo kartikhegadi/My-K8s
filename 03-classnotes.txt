@@ -203,10 +203,118 @@ K8s Volumes
 PV		- Persistent Volume
 PVC	- Persistent Volume Claim
 
+When you want to attach a storage to PODS, we can do it in 2 ways;
+	Static Provisioning		- manual
+	Dynamic Provisioning	- automation****
+
++----------------------+
+|         AWS          |
+|                      |
+|   +----------+       |
+|   |   PV     |       |
+|   |  10 GB   |       |
+|   +----------+       |
++----------------------+
+           │
+           ▼
+
++-----------+      +-----------+      +--------+
+|    PV     | ---> |    PVC    | ---> |  POD   |
+|  10 GB    |      |   10 GB   |      |        |
++-----------+      +-----------+      +--------+
 
 
+Storage Class
+It defines how a volume should be created dynamically - it allows dynamic provisioning of storage
+
+kubectl get sc
+NAME   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2    kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  37m
+
+Reclaim Policy (RECLAIMPOLICY)
+It defines whether you need the volume even after the pod is deleted
+
+Types;
+Retain	
+Delete
+Recycle (Deprecated)
+persistentVolumeReclaimPolicy: Retain
+
+Access Modes
+RWO (ReadWriteOnce)	- one pod on one node can read & write
+ROX (ReadOnlyMany) - multiple pods can read, none can write
+RWX (ReadWriteMany) - multiple pods can read and write the data
+
+*EBS - Volumes supports only RWO
+EFS - Volumes supports  RWX
+
+To follow above we need to Install these 
+------------------------------------------------------------------------------------------
+Install --- Why Dynamically accessing Storage that's y (CSI + IAM )
+CSI Driver - Container Storage Interface
+
+------------------------------------------------------------------------------------------
+Goal: Dynamically provision EBS volumes for a pod using a StorageClass, PVC, and Deployment. We’ll use nginx as the sample application.
+
+Pre-requisites;
+=> IAM Requirement for Worker Nodes:
+Attach AmazonEBSCSIDriverPolicy to your worker node IAM role.
+This allows Kubernetes to create, attach, detach, and delete EBS volumes dynamically.
+
+=> eksctl doesn’t know which AWS region to use. You have to explicitly set it
+eksctl utils associate-iam-oidc-provider --cluster kartik-cluster --region ap-south-1 --approve
+This allows Kubernetes service accounts to assume IAM roles (needed for CSI driver).
+
+=> Check if the EBS CSI driver pods are running:
+kubectl get pods -n kube-system | grep ebs-csi
+
+You should see pods like ebs-csi-controller-... and ebs-csi-node-... in Running state.
+If nothing appears, you need to install it.
+
+=> Install EBS CSI Driver
+Download Helm installation script (Here I will use HELM to do this)
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm version
 
 
+Add the Helm repo
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+
+helm repo update
+# This ensures Helm fetches the latest charts from the repo.
+
+helm repo list
+#You should see something like below;
+NAME                     URL
+aws-ebs-csi-driver       https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+
+Install EBS CSI driver
+helm install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver \
+    --namespace kube-system \
+    --create-namespace \
+    --set image.repository=602401143452.dkr.ecr.ap-south-1.amazonaws.com/eks/aws-ebs-csi-driver
+
+To verify that aws-ebs-csi-driver has started, run:
+
+kubectl get pod -n kube-system -l "app.kubernetes.io/name=aws-ebs-csi-driver,app.kubernetes.io/instance=aws-ebs-csi-driver"
+
+Verify installation
+kubectl get pods -n kube-system | grep ebs-csi
+#You should see controller and node pods in Running state.
+
+kubectl get pod -n kube-system -l "app.kubernetes.io/name=aws-ebs-csi-driver,app.kubernetes.io/instance=aws-ebs-csi-driver"
+
+NAME                                  READY   STATUS    RESTARTS   AGE
+ebs-csi-controller-5cfcbbf6f6-tsj5m   5/5     Running   0          3m37s
+ebs-csi-controller-67dc977479-fv9fr   4/5     Running   0          8s
+ebs-csi-controller-67dc977479-vpj5t   4/5     Running   0          8s
+ebs-csi-node-lls7s                    3/3     Running   0          5s
+ebs-csi-node-mwf45                    3/3     Running   0          8s
+root@ip-172-31-8-147:/home/ubuntu# kubectl get pods -n kube-system | grep ebs-csi
+ebs-csi-controller-67dc977479-fv9fr   5/5     Running   0          102s
+ebs-csi-controller-67dc977479-vpj5t   5/5     Running   0          102s
+ebs-csi-node-lls7s                    3/3     Running   0          99s
+ebs-csi-node-mwf45                    3/3     Running   0          102s
 
 
 
