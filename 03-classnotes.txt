@@ -431,9 +431,14 @@ cd /usr/share/nginx/html/
 root@nginx-deployment-7cd76774dd-8ldx6:/usr/share/nginx/html# ls
 index.html  index1.html  lost+found
 
+Now we will delete the persistant volume (sc.yaml) -- > then also the ebs volume will be present in aws cloud our ebs volume will be present 
 
+kubectl delete -f sc.yaml
 
+it's because of reclaimPolicy: Retain -- > untill and unless it will be there we will manually delete the volume 
 
+delete all 
+kubectl delete -f scv.yaml -f ebc.yaml -f deployment.yaml -f sc.yaml 
 ------------------------------------------------------------------------------------------
 
 
