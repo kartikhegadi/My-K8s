@@ -1,0 +1,78 @@
+RBAC
+HELM
+Monitoring (Theory)
+Cluster Autoscaler
+
+============
+RBAC
+============
+Roll Based Access Control
+
+RBAC is a way to define who can do what in the k8s cluster
+
+who	- users, service accounts
+what	- list, create, delete, patch....
+where	- in a namespace or through out the cluster
+
+**Network Policies
+
+Core RBAC Components:
+Role				- defines what actions can be performed on which resources in a namespace
+ClusterRole			- same as role but applies to all the namespaces
+RoleBinding			- attaches a role to an user / service account in a namespace
+ClusterRoleBinding	- attaches a cluster role across the cluster
+
+
+ServiceAccount	-----> Create a Role (define the permissions)		-----> Role Binding
+
+https://codemia.io/knowledge-hub/path/list_of_kubernetes_rbac_rule_verbs
+https://kubernetes.io/docs/reference/access-authn-authz/authorization/
+
+==============
+HELM
+==============
+Amazon Linux	- yum
+Ubuntu			- apt 
+Python			- pip
+
+Kubernetes - HELM
+helm is a package manager for Kubernetes
+
+helm charts	- a helm chart is collection of yml files
+
+======================
+MONITORING
+======================
+Prometheus
+Grafana
+
+K8s cluster ---- pods
+
+Grafana dashboards
+Prometheus - collect the info from the worker nodes
+
+======================
+Cluster Autoscaler
+======================
+Pod Autoscaling - HPA, VPA
+Node Autoscaling - Node Autoscaler
+
+==============================================================================================================
+ANSIBLE
+---------------------------
+Linux & Shell Scripting 
+Git and GitHub 
+Maven
+Jenkins
+Docker
+Kubernetes
+
+Ansible 
+Ansible is configuration management tool
+
+(Host) Inventory file
+host information
+ansible.cfg
+
+inventory file	---- all the worker nodes info (Private IP)
+ansible.cfg		---- it contains info about the inventory file
