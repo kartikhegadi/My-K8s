@@ -1,0 +1,596 @@
+Namespace:
+
+By default all the resources in Kubernetes will get created in the "default" namespace
+
+Namespace is sused for logical isolation of all the K8s resources to a perticular application 
+
+Default namespaes of K8s
+-default --- > wehnever we crete any pods then it will be creted in default only  
+-Kube-node-lease
+-Kube-public
+-Kube-system
+-----------------------------------------------------------------------------
+Creating namespace
+kubectl create ns <namespace>
+
+show name space 
+kubectl get ns
+
+how to check in which name space we are present 
+1)kubectl get pods
+2)kubectl config view --- it wont show anything if we are in default namespace
+----------------------------SET and Check----------------------------
+kubectl config set-context --current --namespace=dev
+kubectl get pods
+kubectl config view
+
+----------------------------Practice----------------------------
+kubectl config set-context --current --namespace=dev
+
+kubectl run dev-pod1 --image nginx
+kubectl run dev-pod2 --image nginx
+kubectl run dev-pod3 --image nginx
+kubectl run dev-pod4 --image nginx
+
+kubectl get pods
+
+
+kubectl config set-context --current --namespace=default
+
+kubectl get pods
+kubectl config view
+
+kubectl get ns
+
+select specifics name speace pods 
+kubectl get pods -n <namespace>
+ 
+kubectl get pods -n dev
+
+
+kubectl config set-context --current --namespace=test
+
+
+kubectl run test-pod1 --image nginx
+kubectl run test-pod2 --image nginx
+kubectl run test-pod3 --image nginx
+kubectl run test-pod4 --image nginx
+
+kubectl get pods
+kubectl config view
+
+------------------------------------------------------------------------------------
+Can we see pods which are in differnt namespace from preset 
+ex from test to see pods of dev -- yes we can see 
+how? 
+-- present you are in test ---> run this commad 
+kubectl get pods -n dev
+------------------------------------------------------------------------------------
+Can we delete pods which are in differnt namespace from preset 
+ex from test to see pods of dev -- yes we can delete -- but this is not good practice but we need to set RBAC
+
+kubectl delete pod dev-pod1 -n dev
+
+------------------------------------------------------------------------------------
+In same way we can see the services which are created in differnt namespace too 
+
+kubectl get svc -n test
+kubectl get svc -n dev
+
+-------------------------------Deleting NameSpace----------------------------------------------------
+everything which is created in name space will get deleted 
+
+kubectl delete ns <namespce>
+-------------------------------------------------------------------------------------------
+task 
+create name space in manifest file + deploy application using image + k8s using NodePort 
+file name  nameswiggi.yaml
+------------------------------------------------------------------
+apiVersion: v1
+kind: namespace
+metadata:
+  name: swiggi-app
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: swiggi-app-pod
+  namespace: swiggi-app
+  labels:
+    app: swiggi-app
+spec:
+  containers:
+    - name: swiggi-app-container
+      image: kastrov/swiggi
+      ports:
+        - containerPort: 80 
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: swiggi-app-service
+  namespace: swiggi-app
+spec:
+  selector:
+    app: swiggi-app
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80 #service port
+      targetPort: 80 #container port
+      nodePort: 30080
+---------------------------Run--it------------------------------------
+
+kubectl apply -f nameswiggi.yaml
+kubectl get svc -n swiggi-app
+
+------------------------------------------------------
+Kubernetes Controllers
+
+A K8s controller will always maintain the required number of pods for your application HA(high availability) for your application
+
+desired state	- 10 pods
+actual state  - 10 pods - 5 pods + 5 pods
+
+replicas
+
+If a pod crashes, the controller notices the pods and recreates it - reconciliation
+
+Types of Controllers;
+Replication Controller
+Replica Set
+Deployment
+DaemonSet
+StatefulSet
+
+Replication Controller - RC ensures that a specified number of pod replicas are running at any given time
+If a pod fails/deletes, the RC will create a new pod to replace the deleted/failed pod
+
+kind: ReplicationController
+
+template ----> we will write pod information
+------------------------------------------------------------------------------------------------------------
+02-rc.yaml
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: zomato-rc #name of the RC
+spec:
+  replicas: 2
+  selector: #it is used to identify the pod
+    app: zomato-app #it should match label of the pod
+  template:   #here we will write pod information
+    metadata:
+      name: zomato-pod  #pod name #optional
+      labels:
+        app: zomato-app
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: zomato-app
+  ports:
+    - port: 80
+      targetPort: 3000
+
+kubectl apply -f 02-rc.yml
+kubectl get pods
+kubectl get rc
+kubectl get svc  
+
+copy the dns and access the page 
+
+test High availability 
+delete pod 
+
+kubectl delete pod zomato-rc-bgjkg
+
+automatically a new pods will be apperar - no down time & high availability 
+
+How to Scale --- this is mannual scaling 
+kubectl scale rc <name-of-rc> --replicas <number>
+
+kubectl scale rc zomato-rc --replicas 6
+kubectl get pods
+
+
+------------------------------------------------------------------------------------------------------------
+
+HomeWork: Create the RC in a particular namespace
+
+------------------------------------------------------------------------------------------------------------
+Limitations of RC;
+multiple labels to the pod not allowed 
+
+v2 - currently deployed - it is not functioning
+v1 - old version
+
+Rolling Updates is not possible - RC cannot handle rolling updates , it can handel but very slow
+RC is deprecated
+
+
+Replica Set - Advanced version of RC is RS
+
+RC; --- multiple labels to the pod 
+
+  selector: #it is used to identify the pod
+    app:
+
+equality based selector
+
+------------------------------------------------------------------------------------------------------------
+
+RS;
+selector:
+	matchLabels: 
+		app: zomato-app	
+		version: v2
+		env: prod
+
+
+------------------------------------------------------------------------------------------------------------
+03.rs.yml
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: zomato-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zomato-app
+  template:
+    metadata:
+      name: zomato-pod
+      labels:
+        app: zomato-app
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: NodePort
+  selector:
+    app: zomato-app
+  ports:
+    - port: 80
+      targetPort: 3000
+      nodePort: 30000
+------------------------------------------------------------------------------------------------------------
+kubectl apply -f rs.yml
+
+kubectl get pods
+kubectl get rc
+kubectl get svc 
+
+kubectl delete -f rs.yml
+---------------------------------------------------------------------------------------------------------------------
+seeing lables 
+kubectl get pods --show-labels
+
+scaling 
+kubectl scale rs/zomato-rs --replicas=10
+kubectl get pods
+kubectl scale rs/zomato-rs --replicas=3
+kubectl get rs
+
+----------------------------------------------------------------------------------------
+lets see 
+i want to update the image 
+at presnt we are running zomato app , i want to update it to swiggie (let's assume or else you can think like you wanna update it to updated version of zomato)
+
+lets try we will go to the file rs.yml and change the image to image: kastrov/zomato --> swiggie 
+
+kubectl create -f rs.yml
+
+if you apply it will show 
+replica set is already available, just we have change the image we cant change the application 
+
+lets see 
+kubectl apply  -f rs.yml
+it will show 
+replicaset is configured 
+service zomato unchanged 
+
+kubectl get pods
+same old pods are there nothing change.
+just we have chnaged the image the pods won't change 
+
+kubectl get pods -l app=zomato-app | grep -i image 
+
+verify 
+kubectl edit deploy/zomato-deployment  
+here we can see the name is changed 
+
+thus we can say that Rollout is not possible with RC & RS 
+
+
+------------------------------------------------------------------------------------------------------------
+Rollout is not possible with RC & RS
+
+=> Deployment
+Roll back is possible with deployments
+Using Deployments we can manage multiple versions of the same application
+
+Types of Deployment Strategies;
+
+1)Rolling Update (default)	 ---> delete one old pod,crete one new pod, gradually replace old pods with new pods   
+2)Recreate/Big Bang Deployment ---> delete all old pods and crete new pods 
+3)Blue-Green Deployment 
+4)Canary Deployment
+
+
+Version 1 - Zomato (Image: kastrov/Zomato:v1)
+Version 2 - Swiggy (Image: kastrov/Zomato:v2)
+
+
+------------Practicals on Simple Service Deployment---------
+04-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zomato-deployment
+  labels:
+    app: food
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: food
+  template:
+    metadata:
+      labels: 
+        app: food
+    spec:
+      containers:
+        - name: zomato-container
+          image: kastrov/zomato
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zomato-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: food
+  ports:
+    - port: 80
+      targetPort: 3000
+---------------------------------------------------------------------------------------------------------------------------
+
+kubectl apply -f 04-deployment.yaml 
+kubectl get deployments 
+kubectl get deploy 
+kubectl get pods 
+
+kubectl scale deploy/zomato-deployment --replicas=10
+kubectl get pods
+kubectl scale deploy/zomato-deployment --replicas=3
+kubectl get pods
+
+kubectl describe pod -l app=food | grep -i image
+
+now change the deployment
+
+go and edit 
+dont change it  in 04-deployment.yaml --> new it's not a correct procidure 
+
+kubectl edit deploy/zomato-deployment
+before editing we can see the pods which are running are old pods
+
+image: kastrov/zomato --> image: kastrov/swiggy
+
+
+kubectl rollout history deploy/zomato-deployment
+
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         <none>
+
+kubectl annotate deployment zomato-deployment kubernetes.io/change-cause="Updated zomato to swiggy" --overwrite
+
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+3         Updated zomato to swiggy
+
+
+kubectl rollout history deploy/zomato-deployment
+kubectl rollout status deploy/zomato-deployment
+kubectl rollout undo deploy/zomato-deployment
+kubectl get pods
+
+-------------------------------------------blue-green deployment--------------------------------------------------------------
+
+Blue-Green Deployment
+Blue		- old version		- deployed	- users accessing blue version
+Green		- latest version	- deployed	- switch the traffic to green version
+
+In blue green deployment the traffic switches immediately
+Blue deployment yml
+Green deployment yml
+
+Blue deployment yml --> LoadBalancer link  🔵
+Green deployment yml --> LoadBalancer link 🟢 
+
+---------------------------------------------------------------
+🔵 v2  Blue deployment yml
+   \             
+    \____________________________
+                                	\
+                                     ▶ 🌐 COMMON LB URL common service yaml file (🔵+🟢)
+                                    /
+    ______________________________
+   /                        
+🟢 v3  Green deployment yml
+----------------------------------------------------------------
+
+But if we generate like this then on production it will hamper 
+
+lets do
+
+Bluedeployment.yml  |
+Greendeployment.yml | -- CommonServiceFile.yaml 
+
+we should run all three files  
+------------------------------------------------------------------------
+Bluedeployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: blue
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo '<html><body style="background-color:skyblue;">
+            <h2>BLUE (Version 1)</h2>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g "daemon off;"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+
+
+------------------------------------------------------------------------
+Greendeployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: green
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: green
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo '<html><body style="background-color:lightgreen;">
+            <h2>GREEN (Version 2)</h2>
+            </body></html>' > /usr/share/nginx/html/index.html && nginx -g "daemon off;"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+------------------------------------------------------------------------
+CommonServiceFile.yaml 
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx 
+	version: blue # -->  # ← Switch this later to "green" for release 
+  ports:
+    - port: 80
+      targetPort: 80
+------------------------------------------------------------------------
+Deployment
+
+kubectl apply -f blue-deploy.yaml
+kubectl apply -f green-deploy.yaml
+kubectl apply -f service.yaml
+
+Verification
+
+kubectl get pods
+kubectl get svc
+kubectl get endpoints nginx-lb
+
+------------------------------------------------------------------------
+If any error troubleshouting 
+
+kubectl get svc nginx-lb
+see -> EXTERNAL-IP / hostname present
+
+kubectl get endpoints nginx-lb
+------------------------------------------------------------------------
+See it live 
+
+ curl = Command Line Tool to make HTTP requests
+
+👉 watch = run command repeatedly
+👉 -n 1 = every 1 second
+
+watch -n 1 curl http://<LB-URL>
+watch -n 1 curl http://<IP-URL>
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------------
+
+
+--------------------------------------DO-Projects------------------------------------------------------------
+Tasks:
+Zomato App: https://youtu.be/GyoI6-I68aQ?si=XILMtEdOYKUPanwq
+
+Book My Show App: https://youtu.be/hBGVwa8MY4A?si=eyFygjuDcrfJ2A4g
+
+Multibranch Job: https://youtu.be/1ecF4lKBlMo?si=qCECxLQpeyHQW6Mh
+
+GitHub Actions Project: https://youtu.be/q-eSiKqi_0o?si=LDP77YPrE8pHxIxK
+------------------------------------------------------------------------------------------------------------
