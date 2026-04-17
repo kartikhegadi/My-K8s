@@ -1,0 +1,11 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-sc # we will mention this storage class in our PVC
+provisioner: ebs.csi.aws.com # AWS EBS CSI driver
+volumeBindingMode: WaitForFirstConsumer # Delay volume binding until a pod uses the PVC
+reclaimPolicy: Retain # Retain the volume after PVC deletion (you can also use
+#allowVolumeExpansion: true # Allow resizing of the volume after creation
+
+parameters:
+  type: gp3 # EBS volume type (gp3 is general purpose SSD)
