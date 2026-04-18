@@ -416,6 +416,19 @@ docker push kartik404/app3-image:latest
 docker images
 
 kubectl apply -f ./k8s 
+----------------------------------------------------------------------
+Ingress 
+
+kubectl get ingress
+kubectl get ing
+
+kubectl describe ingress apps-ingress
+kubectl get svc -n ingress-nginx
+kubectl get pods -A
+kubectl get pods
+kubectl get svc
+
+----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
 Task: https://youtu.be/3fhvnsNY5fc?si=U6gX5T9xMQrfMt_P
