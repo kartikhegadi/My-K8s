@@ -1,1 +1,405 @@
+Ingress Controller
+An Ingress Controller is a reverse proxy/load balancer that routes external HTTP/HTTPS traffic to the correct Kubernetes services based on rules defined in the Ingress.
 
+Pages         Ports
+Home Page -     81
+Products Page - 82
+Cart Page -     83
+....
+
+Port Based Routing
+PublicIP:82
+
+Path Based Routing
+
+
+------------------------------------------------------------------------------------------------
+INGRESS CONTROLLER DEMO
+------------------------------------------------------------------------------------------------
++---------------------------+          +----------------------------------+
+|    Developer Inputs       |          |        Ingress Config            |
+|---------------------------|          |----------------------------------|
+| Dockerfile1,2,3           |          | ingress.yml                      |
+| Image1, Image2, Image3    |          | microservices configuration      |
+| Push images -> Dockerhub  |          | rules configuration              |
+| YML: image1:v1            |          | Nginx, AWS LB, Kong,             |
+| Ingress yml file          |          | HAProxy, Traefik                 |
++---------------------------+          +----------------------------------+
+              \                                      /
+               \                                    /
+                v                                  v
++---------------------------------------------------------------+
+|                     Ingress Controller                        |
+|                  /app1     /app2     /app3                    |
++---------------------------------------------------------------+
+        |                    |                     |
+   (LB URL 1)           (LB URL 2)            (LB URL 3)
+        |                    |                     |
+        v                    v                     v
++----------------+  +----------------+  +----------------+
+| Microservice 1 |  | Microservice 2 |  | Microservice 3 |
+|    /app1       |  |    /app2       |  |    /app3       |
++----------------+  +----------------+  +----------------+
+service type:       service type:       service type:
+ClusterIP           ClusterIP           ClusterIP
+
+                                  +----------------------------+
+                                  | service type: ClusterIP    |
+                                  | 3 deployment manifest files|
+                                  | 3 service manifest files   |
+                                  +----------------------------+
+
+--------------------------------------------------------------------------------------------
+Installation 
+
+Install Docker
+apt install docker.io
+
+Install tree
+apt install tree -y
+
+Install ingress controller ---->
+To install ingress, firstly we have to install nginx ingress controller:
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.3.0/deploy/static/provider/cloud/deploy.yaml
+
+kubectl get ing --> shows ingress service , no ingress service
+
+Verify the ingress pods
+kubectl get pods -n ingress-nginx
+
+Verify the ingress service 
+kubectl get svc -n ingress-nginx ----> You will see load balancer url
+aaf62657d0dc04b35be250af4d6e47f7-1092281608.ap-south-1.elb.amazonaws.com
+We will see the above URL to access the app
+
+--------------------------------------------------------------------------------------------
+Practicals 
+
+Create the directory structure as below;
+.
+├── app1
+│   ├── Dockerfile
+│   └── index.html
+├── app2
+│   ├── Dockerfile
+│   └── index.html
+├── app3
+│   ├── Dockerfile
+│   └── index.html
+└── k8s
+    ├── app1-deploy.yaml
+    ├── app2-deploy.yaml
+    ├── app3-deploy.yaml
+    └── ingress.yaml
+--------------------------------------------------------------------------------------------
+CreateFiles.sh
+
+#!/bin/bash
+
+# Create main directories
+mkdir -p app1 app2 app3 k8s
+
+# Create files inside app folders
+touch app1/Dockerfile app1/index.html
+touch app2/Dockerfile app2/index.html
+touch app3/Dockerfile app3/index.html
+
+# Create Kubernetes YAML files
+touch k8s/app1-deploy.yaml
+touch k8s/app2-deploy.yaml
+touch k8s/app3-deploy.yaml
+touch k8s/ingress.yaml
+
+echo "✅ Project structure created successfully!"
+
+# Optional: show structure
+tree .
+--------------------------------------------------------------------------------------------
+Dockerfile is same in all the directories;
+FROM nginx:alpine
+COPY ./index.html /usr/share/nginx/html/index.html
+--------------------------------------------------------------------------------------------
+Add These HTML Files in all app directories 
+
+app1/index.html 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>App 1 - Ingress Demo</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #ff4e50, #f9d423);
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+      text-align: center;
+      animation: fadeIn 1s ease-in;
+    }
+    h1 {
+      font-size: 4rem;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+    }
+    p {
+      font-size: 1.5rem;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>🚀 App 1 Loaded</h1>
+    <p>This is the futuristic red version of App 1, powered by Kubernetes & Ingress on AWS EKS.</p>
+  </div>
+</body>
+</html>
+--------------------------------------------------------------------------------------------
+app2/index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>App 2 - Ingress Demo</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #56ab2f, #a8e063);
+      font-family: 'Helvetica Neue', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+      text-align: center;
+      animation: slideUp 1s ease-in-out;
+    }
+    h1 {
+      font-size: 3.5rem;
+      margin-bottom: 15px;
+    }
+    p {
+      font-size: 1.4rem;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>🌿 App 2 is Live</h1>
+    <p>This is App 2, deployed in Kubernetes and beautifully routed via Ingress.</p>
+  </div>
+</body>
+</html>
+
+--------------------------------------------------------------------------------------------
+app3/index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>App 3 - Ingress Demo</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      font-family: 'Roboto', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #ffffffcc;
+      text-align: center;
+      animation: zoomIn 1s ease;
+    }
+    h1 {
+      font-size: 4rem;
+      margin-bottom: 10px;
+    }
+    p {
+      font-size: 1.3rem;
+    }
+    @keyframes zoomIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>🌊 Welcome to App 3</h1>
+    <p>This is App 3 — clean, responsive, and routed with Kubernetes Ingress on EKS.</p>
+  </div>
+</body>
+</html>
+
+--------------------------------------------------------------------------------------------
+Manifest files in K8s folder 
+--------------------------------------------------------------------------------------------
+app1.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1
+  template:
+    metadata:
+      labels:
+        app: app1
+    spec:
+      containers:
+        - name: app1
+          image: kastrov/app1-image:latest
+          ports: 
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-service  #this service name will be referenced in the ingress yml file
+spec:
+  selector:
+    app: app1
+  ports:
+    - port: 80
+      targetPort: 80
+--------------------------------------------------------------------------------------------
+app2.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app2
+  template:
+    metadata:
+      labels:
+        app: app2
+    spec:
+      containers:
+        - name: app2
+          image: kastrov/app2-image:latest
+          ports: 
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-service  #this service name will be referenced in the ingress yml file
+spec:
+  selector:
+    app: app2
+  ports:
+    - port: 80
+      targetPort: 80
+
+--------------------------------------------------------------------------------------------
+app3.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app3
+  template:
+    metadata:
+      labels:
+        app: app3
+    spec:
+      containers:
+        - name: app3
+          image: kastrov/app3-image:latest
+          ports: 
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3-service  #this service name will be referenced in the ingress yml file
+spec:
+  selector:
+    app: app3
+  ports:
+    - port: 80
+      targetPort: 80
+--------------------------------------------------------------------------------------------
+ingress.yml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apps-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /app1
+            pathType: Prefix
+            backend:
+              service:
+                name: app1-service
+                port: 
+                  number: 80
+          - path: /app2
+            pathType: Prefix
+            backend:
+              service:
+                name: app2-service
+                port: 
+                  number: 80
+          - path: /app3
+            pathType: Prefix
+            backend:
+              service:
+                name: app3-service
+                port: 
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app1-service
+                port: 
+                  number: 80
+--------------------------------------------------------------------------------------------
+
+
+
+
+----------------------------------------------------------------------
+Task: https://youtu.be/3fhvnsNY5fc?si=U6gX5T9xMQrfMt_P
+----------------------------------------------------------------------
