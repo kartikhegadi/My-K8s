@@ -15,19 +15,19 @@ Path Based Routing
 
 ------------------------------------------------------------------------------------------------
 INGRESS CONTROLLER DEMO
-------------------------------------------------------------------------------------------------
-+---------------------------+          +----------------------------------+
-|    Developer Inputs       |          |        Ingress Config            |
-|---------------------------|          |----------------------------------|
-| Dockerfile1,2,3           |          | ingress.yml                      |
-| Image1, Image2, Image3    |          | microservices configuration      |
-| Push images -> Dockerhub  |          | rules configuration              |
-| YML: image1:v1            |          | Nginx, AWS LB, Kong,             |
-| Ingress yml file          |          | HAProxy, Traefik                 |
-+---------------------------+          +----------------------------------+
-              \                                      /
-               \                                    /
-                v                                  v
+------------------------------------------------------------------------------------------------                              USER
++---------------------------+    |       +----------------------------------+
+|    Developer Inputs       |    |      |        Ingress Config            |
+|---------------------------|    |      |----------------------------------|
+| Dockerfile1,2,3           |    |      | ingress.yml                      |
+| Image1, Image2, Image3    |    |      | microservices configuration      |
+| Push images -> Dockerhub  |    |      | rules configuration              |
+| YML: image1:v1            |    |      | Nginx, AWS LB, Kong,             |
+| Ingress yml file          |    |      | HAProxy, Traefik                 |
++---------------------------+    |      +----------------------------------+
+                                 |                   
+                                 |                  
+                               \ | /                 
 +---------------------------------------------------------------+
 |                     Ingress Controller                        |
 |                  /app1     /app2     /app3                    |
@@ -43,11 +43,11 @@ INGRESS CONTROLLER DEMO
 service type:       service type:       service type:
 ClusterIP           ClusterIP           ClusterIP
 
-                                  +----------------------------+
-                                  | service type: ClusterIP    |
-                                  | 3 deployment manifest files|
-                                  | 3 service manifest files   |
-                                  +----------------------------+
+                                  +----------------------------+     NGINX
+                                  | service type: ClusterIP    |     AWS LB
+                                  | 3 deployment manifest files|     Kong
+                                  | 3 service manifest files   |     HAProxy
+                                  +----------------------------+     Traefik
 
 --------------------------------------------------------------------------------------------
 Installation 
@@ -428,6 +428,7 @@ kubectl get pods -A
 kubectl get pods
 kubectl get svc
 
+kubectl get deploy
 ----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
