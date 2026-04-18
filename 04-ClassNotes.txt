@@ -272,7 +272,7 @@ spec:
     spec:
       containers:
         - name: app1
-          image: kastrov/app1-image:latest
+          image: kartik404/app1-image:latest
           ports: 
             - containerPort: 80
 ---
@@ -305,7 +305,7 @@ spec:
     spec:
       containers:
         - name: app2
-          image: kastrov/app2-image:latest
+          image: kartik404/app2-image:latest
           ports: 
             - containerPort: 80
 ---
@@ -339,7 +339,7 @@ spec:
     spec:
       containers:
         - name: app3
-          image: kastrov/app3-image:latest
+          image: kartik404/app3-image:latest
           ports: 
             - containerPort: 80
 ---
@@ -396,9 +396,26 @@ spec:
                 port: 
                   number: 80
 --------------------------------------------------------------------------------------------
+Build Docker Images 
 
+docker login -u kartik404
+passwd: ********
 
+docker build -t app1-image /app1 
+docker build -t app2-image /app2 
+docker build -t app3-image /app3 
 
+docker tag app1-image kartik404/app1-image:latest
+docker tag app2-image kartik404/app2-image:latest
+docker tag app3-image kartik404/app3-image:latest
+
+docker push kartik404/app1-image:latest
+docker push kartik404/app2-image:latest
+docker push kartik404/app3-image:latest
+
+docker images
+
+kubectl apply -f ./k8s 
 
 ----------------------------------------------------------------------
 Task: https://youtu.be/3fhvnsNY5fc?si=U6gX5T9xMQrfMt_P
