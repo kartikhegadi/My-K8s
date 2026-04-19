@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>峠 · Bike Race</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;700&family=Zen+Dots&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00E5FF;
+    --teal: #00BCD4;
+    --neon: #39FF14;
+    --ink: #010815;
+    --paper: #E8F4F8;
+    --sakura: #FF80AB;
+    --gold: #FFD740;
+    --chrome: #90A4AE;
+    --silver: #CFD8DC;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--ink);
+    font-family: 'Noto Serif JP', serif;
+    overflow: hidden;
+    height: 100vh; width: 100vw;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative;
+  }
+  .bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 15% 60%, rgba(0,60,120,0.3) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 40%, rgba(0,100,100,0.2) 0%, transparent 55%),
+      linear-gradient(180deg, #010815 0%, #010D20 50%, #010508 100%);
+  }
+  .grid-floor {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 200px; overflow: hidden; perspective: 300px; z-index: 1;
+  }
+  .grid-plane {
+    position: absolute; bottom: 0; left: -50%; right: -50%; height: 400px;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.08) 1px, transparent 1px);
+    background-size: 60px 40px;
+    transform: rotateX(70deg); transform-origin: bottom center;
+    animation: gridScroll 0.5s linear infinite;
+  }
+  @keyframes gridScroll {
+    0%   { background-position: 0 0; }
+    100% { background-position: -60px 0; }
+  }
+  .title-block {
+    position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+    text-align: center; z-index: 10; white-space: nowrap;
+  }
+  .title-jp {
+    font-weight: 300; font-size: 11px; letter-spacing: 10px;
+    color: var(--cyan); opacity: 0.8;
+  }
+  .title-main {
+    font-family: 'Zen Dots', cursive;
+    font-size: clamp(26px,5vw,54px); color: var(--paper);
+    letter-spacing: 6px; line-height: 1; margin-top: 4px;
+    text-shadow: 0 0 30px rgba(0,229,255,0.9), 0 0 70px rgba(0,229,255,0.4);
+  }
+  .title-sub { font-size: 10px; letter-spacing: 7px; color: var(--chrome); margin-top: 6px; opacity: 0.5; }
+  .kanji-v {
+    position: absolute; top: 0; bottom: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; font-size: 16px; font-weight: 700;
+    color: rgba(0,229,255,0.12); z-index: 2; pointer-events: none;
+    animation: kanjiPulse 3s ease-in-out infinite alternate;
+  }
+  .kanji-v.left { left: 24px; }
+  .kanji-v.right { right: 24px; }
+  @keyframes kanjiPulse { 0% { opacity:0.6; } 100% { opacity:1; } }
+  .scene {
+    position: relative; width: 100vw; height: 360px; overflow: hidden;
+  }
+  .mountains { position: absolute; bottom: 110px; left: 0; right: 0; z-index: 2; pointer-events: none; }
+  .road {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 120px;
+    background: linear-gradient(180deg, #0a1520 0%, #060e18 100%);
+    border-top: 2px solid rgba(0,229,255,0.2); z-index: 3;
+  }
+  .road-line {
+    position: absolute; top: 50%; height: 3px; width: 100px;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.4), transparent);
+    animation: roadLine 0.5s linear infinite;
+  }
+  @keyframes roadLine { 0% { transform: translateX(110vw); } 100% { transform: translateX(-150px); } }
+  .road-line:nth-child(1) { animation-delay: 0s; }
+  .road-line:nth-child(2) { animation-delay: -0.17s; }
+  .road-line:nth-child(3) { animation-delay: -0.33s; }
+  .motion-line {
+    position: absolute; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.25), transparent);
+    animation: motionLine linear infinite; z-index: 4;
+  }
+  @keyframes motionLine { 0% { transform: translateX(110vw); } 100% { transform: translateX(-300px); } }
+  .bike-wrapper {
+    position: absolute; bottom: 88px; left: 18%; z-index: 7;
+    animation: bikeBob 0.06s ease-in-out infinite alternate, bikeEntry 1.8s ease-out forwards;
+    filter: drop-shadow(0 8px 24px rgba(0,229,255,0.5)) drop-shadow(0 0 50px rgba(0,229,255,0.25));
+  }
+  @keyframes bikeBob { 0% { transform:translateY(0px) rotate(-0.5deg); } 100% { transform:translateY(-4px) rotate(0.5deg); } }
+  @keyframes bikeEntry { 0% { left:-40%; opacity:0; } 100% { left:18%; opacity:1; } }
+  .bike-svg { width: 240px; height: auto; }
+  .bike-beam {
+    position: absolute; bottom: 112px; left: calc(18% + 232px);
+    width: 180px; height: 50px;
+    background: linear-gradient(90deg, rgba(0,229,255,0.5), transparent);
+    clip-path: polygon(0 40%, 100% 0%, 100% 100%, 0 60%);
+    z-index: 6; animation: beamBike 0.2s ease-in-out infinite alternate, bikeEntry 1.8s ease-out forwards;
+  }
+  @keyframes beamBike { 0% { opacity:0.6; } 100% { opacity:1; } }
+  .wheel-sparks {
+    position: absolute; bottom: 92px; left: calc(18% + 0px);
+    z-index: 8; pointer-events: none;
+    animation: bikeEntry 1.8s ease-out forwards;
+  }
+  .wspark {
+    position: absolute; width: 2px; height: 2px; border-radius: 50%;
+    background: var(--cyan); animation: wsparkAnim linear infinite;
+  }
+  @keyframes wsparkAnim { 0% { transform:translate(0,0) scale(1); opacity:1; } 100% { transform:translate(-50px,-30px) scale(0); opacity:0; } }
+  .petals-layer { position: absolute; inset: 0; pointer-events: none; z-index: 9; }
+  .petal {
+    position: absolute; top: -15px; border-radius: 50% 50% 0 50%; opacity: 0.6;
+    animation: petalDrop linear infinite;
+  }
+  @keyframes petalDrop { 0% { transform:translate(0,-10px) rotate(0deg); opacity:.7; } 100% { transform:translate(60px,380px) rotate(540deg); opacity:0; } }
+  .hud-speed { position: absolute; bottom: 20px; right: 36px; z-index: 10; text-align: right; }
+  .speed-val {
+    font-family: 'Zen Dots', cursive; font-size: 52px; color: var(--cyan); line-height: 1;
+    text-shadow: 0 0 20px var(--cyan), 0 0 50px rgba(0,229,255,0.5);
+  }
+  .speed-unit { font-size: 11px; letter-spacing: 4px; color: var(--chrome); opacity: 0.6; }
+  .rpm-block { position: absolute; bottom: 22px; left: 36px; z-index: 10; }
+  .rpm-label { font-size: 10px; letter-spacing: 5px; color: var(--teal); text-transform: uppercase; margin-bottom: 6px; }
+  .rpm-bars { display: flex; gap: 4px; align-items: flex-end; height: 40px; }
+  .rpm-bar { width: 8px; border-radius: 2px 2px 0 0; transition: height 0.08s ease; }
+  .timer { position: absolute; top: 96px; right: 36px; z-index: 10; text-align: right; }
+  .timer-label { font-size: 10px; letter-spacing: 5px; color: var(--teal); opacity: 0.7; }
+  .timer-val { font-family: 'Zen Dots', cursive; font-size: 28px; color: var(--paper); text-shadow: 0 0 15px rgba(0,229,255,0.4); }
+  .seal {
+    position: absolute; top: 90px; left: 36px; width: 66px; height: 66px;
+    border: 1.5px solid rgba(0,229,255,0.4); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; z-index: 10;
+    animation: sealSpin 10s linear infinite;
+    box-shadow: 0 0 20px rgba(0,229,255,0.15), inset 0 0 20px rgba(0,229,255,0.05);
+  }
+  .seal-txt { font-size: 10px; color: var(--cyan); text-align: center; line-height: 1.3; font-weight: 700; }
+  @keyframes sealSpin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+  .hline {
+    position: absolute; left: 36px; right: 36px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.3), rgba(0,229,255,0.1), transparent);
+    z-index: 10;
+  }
+  .hline.top { top: 80px; } .hline.bottom { bottom: 75px; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
+  .orb1 { width:350px; height:250px; background:rgba(0,100,180,0.15); top:25%; left:8%; }
+  .orb2 { width:250px; height:200px; background:rgba(0,180,160,0.1); top:30%; right:12%; }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="title-block">
+  <div class="title-jp">峠バトル · TOUGE BATTLE</div>
+  <div class="title-main">BIKE RACE</div>
+  <div class="title-sub">疾風と夜 · SWIFT WIND &amp; NIGHT</div>
+</div>
+
+<div class="kanji-v left">峠<br>風<br>疾<br>速<br>夜<br>走<br>峠</div>
+<div class="kanji-v right">道<br>魂<br>炎<br>光<br>夢<br>力<br>道</div>
+
+<div class="hline top"></div>
+<div class="hline bottom"></div>
+<div class="seal"><div class="seal-txt">MX<br>頂点</div></div>
+
+<div class="timer">
+  <div class="timer-label">ラップ時間</div>
+  <div class="timer-val" id="timer">01:32.4</div>
+</div>
+
+<div class="scene">
+  <div class="grid-floor"><div class="grid-plane"></div></div>
+
+  <div class="mountains">
+    <svg viewBox="0 0 1440 170" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="0,170 180,50 320,130 500,25 680,120 850,35 1050,110 1220,20 1380,80 1440,55 1440,170" fill="#020A14"/>
+      <polygon points="0,170 120,90 250,150 420,60 600,140 760,55 940,130 1100,45 1300,120 1440,70 1440,170" fill="#030F1E" opacity="0.9"/>
+      <polyline points="0,170 120,90 250,150 420,60 600,140 760,55 940,130 1100,45 1300,120 1440,70" fill="none" stroke="rgba(0,229,255,0.08)" stroke-width="1.5"/>
+      <circle cx="200" cy="45" r="22" fill="rgba(0,229,255,0.06)"/>
+      <circle cx="200" cy="45" r="10" fill="rgba(232,244,248,0.08)"/>
+      <circle cx="900" cy="20" r="1.5" fill="rgba(232,244,248,0.5)"/>
+      <circle cx="1100" cy="35" r="1" fill="rgba(232,244,248,0.4)"/>
+      <circle cx="700" cy="15" r="1.2" fill="rgba(232,244,248,0.4)"/>
+      <circle cx="1300" cy="18" r="1.5" fill="rgba(232,244,248,0.5)"/>
+    </svg>
+  </div>
+
+  <div id="motionLines"></div>
+
+  <div class="road">
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+  </div>
+
+  <div class="bike-beam" id="bikeBeam"></div>
+  <div class="wheel-sparks" id="wheelSparks"></div>
+
+  <div class="bike-wrapper" id="bike">
+    <svg class="bike-svg" viewBox="0 0 240 110" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="120" cy="108" rx="85" ry="5" fill="rgba(0,0,0,0.4)"/>
+      <!-- Rear wheel -->
+      <circle cx="42" cy="88" r="22" fill="#0A1520" stroke="#1A2A3A" stroke-width="2.5"/>
+      <line x1="42" y1="66" x2="42" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(0,42,88)"/>
+      <line x1="42" y1="66" x2="42" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(45,42,88)"/>
+      <line x1="42" y1="66" x2="42" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(90,42,88)"/>
+      <line x1="42" y1="66" x2="42" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(135,42,88)"/>
+      <circle cx="42" cy="88" r="10" fill="#0E2030" stroke="#00E5FF" stroke-width="1.5" opacity="0.8"/>
+      <circle cx="42" cy="88" r="4" fill="#00E5FF" opacity="0.7"/>
+      <circle cx="42" cy="88" r="22" fill="none" stroke="rgba(0,229,255,0.2)" stroke-width="3"/>
+      <!-- Front wheel -->
+      <circle cx="198" cy="88" r="22" fill="#0A1520" stroke="#1A2A3A" stroke-width="2.5"/>
+      <line x1="198" y1="66" x2="198" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(20,198,88)"/>
+      <line x1="198" y1="66" x2="198" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(65,198,88)"/>
+      <line x1="198" y1="66" x2="198" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(110,198,88)"/>
+      <line x1="198" y1="66" x2="198" y2="110" stroke="#1E3A4A" stroke-width="1.5" transform="rotate(155,198,88)"/>
+      <circle cx="198" cy="88" r="10" fill="#0E2030" stroke="#00E5FF" stroke-width="1.5" opacity="0.8"/>
+      <circle cx="198" cy="88" r="4" fill="#00E5FF" opacity="0.7"/>
+      <circle cx="198" cy="88" r="22" fill="none" stroke="rgba(0,229,255,0.2)" stroke-width="3"/>
+      <!-- Frame -->
+      <line x1="42" y1="88" x2="120" y2="55" stroke="#1A3A50" stroke-width="4" stroke-linecap="round"/>
+      <line x1="120" y1="55" x2="198" y2="88" stroke="#1A3A50" stroke-width="3" stroke-linecap="round"/>
+      <line x1="42" y1="88" x2="100" y2="65" stroke="#1A3A50" stroke-width="3" stroke-linecap="round"/>
+      <!-- Fairing -->
+      <path d="M65,72 Q85,38 120,30 Q155,22 185,40 L195,60 Q175,48 140,42 Q110,36 85,58 Z" fill="#0D2040" stroke="#1A3A60" stroke-width="1"/>
+      <path d="M70,68 Q90,45 120,36 Q152,26 182,44" fill="none" stroke="#00E5FF" stroke-width="1.5" opacity="0.7"/>
+      <path d="M65,80 Q75,90 120,92 Q165,90 175,80 L185,60 Q155,68 120,70 Q85,68 65,60 Z" fill="#091828" stroke="#0A2235" stroke-width="1"/>
+      <!-- Windscreen -->
+      <path d="M122,30 Q140,18 165,28 L175,46 Q158,34 138,38 Z" fill="rgba(0,180,220,0.15)" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+      <!-- Rider -->
+      <ellipse cx="110" cy="45" rx="16" ry="10" fill="#0A1830"/>
+      <path d="M95,45 Q98,30 110,26 Q122,22 128,35 L115,45 Z" fill="#0F2040"/>
+      <ellipse cx="108" cy="32" rx="12" ry="11" fill="#0D2040" stroke="#1A3A60" stroke-width="1"/>
+      <path d="M100,28 Q108,20 118,26" fill="none" stroke="rgba(0,229,255,0.4)" stroke-width="1.5"/>
+      <path d="M100,33 Q108,28 118,32" fill="none" stroke="rgba(0,229,255,0.6)" stroke-width="1.5"/>
+      <!-- Exhaust -->
+      <path d="M55,78 L20,80 L18,86 L55,84 Z" fill="#152030"/>
+      <!-- Headlight -->
+      <ellipse cx="216" cy="76" rx="7" ry="5" fill="rgba(0,229,255,0.9)"/>
+      <ellipse cx="216" cy="76" rx="10" ry="7" fill="rgba(0,229,255,0.2)"/>
+      <ellipse cx="216" cy="76" rx="14" ry="10" fill="rgba(0,229,255,0.05)">
+        <animate attributeName="rx" values="14;18;14" dur="0.3s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="0.3s" repeatCount="indefinite"/>
+      </ellipse>
+      <!-- Tail light -->
+      <ellipse cx="20" cy="73" rx="5" ry="3.5" fill="rgba(255,23,68,0.9)"/>
+      <ellipse cx="20" cy="73" rx="8" ry="5" fill="rgba(255,23,68,0.25)"/>
+      <!-- Underglow -->
+      <path d="M60,100 Q120,106 180,100" fill="none" stroke="#00E5FF" stroke-width="1.5" opacity="0.4">
+        <animate attributeName="opacity" values="0.3;0.7;0.3" dur="0.4s" repeatCount="indefinite"/>
+      </path>
+      <!-- Number plate -->
+      <rect x="92" y="55" width="36" height="20" rx="3" fill="rgba(0,30,50,0.8)" stroke="rgba(0,229,255,0.3)" stroke-width="0.5"/>
+      <text x="110" y="69" text-anchor="middle" font-family="'Zen Dots',cursive" font-size="12" fill="#00E5FF" opacity="0.9">07</text>
+    </svg>
+  </div>
+
+  <div class="petals-layer" id="petals"></div>
+</div>
+
+<div class="hud-speed">
+  <div class="speed-val" id="speedVal">312</div>
+  <div class="speed-unit">km/h · 時速</div>
+</div>
+
+<div class="rpm-block">
+  <div class="rpm-label">回転数 · RPM</div>
+  <div class="rpm-bars" id="rpmBars"></div>
+</div>
+
+<script>
+  // Motion lines
+  const ml = document.getElementById('motionLines');
+  for(let i=0;i<20;i++){
+    const l=document.createElement('div');
+    l.className='motion-line';
+    const top=30+Math.random()*220;
+    const w=40+Math.random()*180;
+    const dur=0.25+Math.random()*0.35;
+    const delay=-Math.random()*dur;
+    l.style.cssText=`top:${top}px;width:${w}px;animation-duration:${dur}s;animation-delay:${delay}s;position:absolute;left:0;right:0;z-index:4;`;
+    ml.appendChild(l);
+  }
+  // Wheel sparks
+  const ws=document.getElementById('wheelSparks');
+  const sc=['#00E5FF','#39FF14','#FFD740'];
+  for(let i=0;i<6;i++){
+    const sp=document.createElement('div');
+    sp.className='wspark';
+    const top=Math.random()*20-10;
+    const left=Math.random()*10;
+    const dur=0.3+Math.random()*0.25;
+    const delay=-Math.random()*dur;
+    sp.style.cssText=`top:${top}px;left:${left}px;animation-duration:${dur}s;animation-delay:${delay}s;background:${sc[i%3]};`;
+    ws.appendChild(sp);
+  }
+  // Petals
+  const pc=document.getElementById('petals');
+  const pc2=['#FF80AB','#B39DDB','#80DEEA','#F48FB1'];
+  for(let i=0;i<14;i++){
+    const p=document.createElement('div');
+    p.className='petal';
+    const left=Math.random()*100;
+    const dur=4+Math.random()*5;
+    const delay=-Math.random()*dur;
+    const size=5+Math.random()*7;
+    const color=pc2[Math.floor(Math.random()*pc2.length)];
+    p.style.cssText=`left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s;width:${size}px;height:${size*0.75}px;background:${color};opacity:0.5;`;
+    pc.appendChild(p);
+  }
+  // RPM bars
+  const rb=document.getElementById('rpmBars');
+  const rc=['#00E5FF','#00BCD4','#00E5FF','#00BCD4','#00E5FF','#39FF14','#FFD740','#FF5252'];
+  const barEls=[];
+  for(let i=0;i<12;i++){
+    const bar=document.createElement('div');
+    bar.className='rpm-bar';
+    const h=12+Math.random()*28;
+    const active=i<9;
+    const color=rc[Math.min(i,rc.length-1)];
+    bar.style.cssText=`height:${h}px;background:${active?color:'rgba(255,255,255,0.08)'};`;
+    rb.appendChild(bar);
+    barEls.push(bar);
+  }
+  // Speed + RPM animation
+  let base=312;
+  setInterval(()=>{
+    const v=base+Math.floor(Math.random()*16)-7;
+    document.getElementById('speedVal').textContent=v;
+    barEls.forEach((b,i)=>{
+      if(i<9){ b.style.height=(10+Math.random()*30)+'px'; }
+    });
+  },100);
+  // Timer
+  let ms=92400;
+  setInterval(()=>{
+    ms+=10;
+    const mins=Math.floor(ms/60000);
+    const secs=Math.floor((ms%60000)/1000);
+    const cent=Math.floor((ms%1000)/10);
+    document.getElementById('timer').textContent=
+      String(mins).padStart(2,'0')+':'+
+      String(secs).padStart(2,'0')+'.'+
+      String(cent).padStart(2,'0').charAt(0);
+  },100);
+</script>
+</body>
+</html>

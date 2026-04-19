@@ -1,0 +1,86 @@
+Here are your two Dockerfiles! Now here's exactly how to build and push both to Docker Hub:
+
+---
+
+### 📁 Your folder structure should look like this
+```
+your-folder/
+├── car_race.html
+├── bike_race.html
+├── Dockerfile.car
+└── Dockerfile.bike
+```
+
+---
+
+### 🔐 Step 1 — Login to Docker Hub
+```bash
+docker login
+# enter your Docker Hub username & password
+```
+
+---
+
+### 🏎️ Step 2 — Build & Push Car Race
+```bash
+# Build (replace 'yourname' with your Docker Hub username)
+docker build -f Dockerfile.car -t yourname/car-race:latest .
+
+# Push
+docker push yourname/car-race:latest
+```
+
+---
+
+### 🏍️ Step 3 — Build & Push Bike Race
+```bash
+# Build
+docker build -f Dockerfile.bike -t yourname/bike-race:latest .
+
+# Push
+docker push yourname/bike-race:latest
+```
+
+---
+
+### ▶️ Step 4 — Run them locally to test
+```bash
+# Car race → open http://localhost:8080
+docker run -d -p 8080:80 yourname/car-race:latest
+
+# Bike race → open http://localhost:8081
+docker run -d -p 8081:80 yourname/bike-race:latest
+```
+
+---
+docker build -f Dockerfile.car -t yourname/car-race:latest .
+docker push yourname/car-race:lates
+
+docker build -f Dockerfile.bike -t yourname/bike-race:latest .
+docker push yourname/bike-race:latest
+
+
+# Car  → http://localhost:8080
+docker run -d -p 8080:80 yourname/car-race:latest
+
+# Bike → http://localhost:8081
+docker run -d -p 8081:80 yourname/bike-race:latest
+
+
+# 1. Replace image name with your Docker Hub username first
+#    e.g. your-dockerhub-username/car-race  →  johnsmith/car-race
+
+# 2. Apply both
+kubectl apply -f car-race-k8s.yaml
+kubectl apply -f bike-race-k8s.yaml
+
+# 3. Watch pods come up
+kubectl get pods -l app=car-race
+kubectl get pods -l app=bike-race
+
+# 4. Get the external IPs
+kubectl get svc car-race-service
+kubectl get svc bike-race-service
+
+
+t

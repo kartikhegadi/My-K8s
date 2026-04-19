@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────
+#  🏍️  Bike Race — Kubernetes Manifest
+#  Apply : kubectl apply -f bike-race-k8s.yaml
+#  Check : kubectl get pods -l app=bike-race
+# ─────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bike-race-deployment
+  labels:
+    app: bike-race
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bike-race
+  template:
+    metadata:
+      labels:
+        app: bike-race
+    spec:
+      containers:
+        - name: bike-race-container
+          image: your-dockerhub-username/bike-race:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: bike-race-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: bike-race
+  ports:
+    - port: 80
+      targetPort: 80

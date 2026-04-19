@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────
+#  🏎️  Car Race — Kubernetes Manifest
+#  Apply : kubectl apply -f car-race-k8s.yaml
+#  Check : kubectl get pods -l app=car-race
+# ─────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: car-race-deployment
+  labels:
+    app: car-race
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: car-race
+  template:
+    metadata:
+      labels:
+        app: car-race
+    spec:
+      containers:
+        - name: car-race-container
+          image: your-dockerhub-username/car-race:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: car-race-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: car-race
+  ports:
+    - port: 80
+      targetPort: 80
