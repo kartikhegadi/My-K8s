@@ -662,11 +662,251 @@ Create the Ingress:
 kubectl apply -f ingress-https.yml
 ----------------------------------------------------------------------
 
+===================================================================================================
+Autoscaling in K8s
+===================================================================================================
+Horizontal Pod Autoscaling
+Vertical Pod Autoscaling
+
+Types of autoscaling;
+Memory based scaling
+CPU based scaling
+
+CPU > 80% ---> Increase the pod count
+CPU < 10% ----> Decrease the pod count
+
+Install Metrics Server to perform the autoscaling
+If you are working with cloud specific clusters, metrics server will get installed by default
+---------------------------------------------------------------------------------------------------
+================================================================================
+           KUBERNETES AUTOSCALING — SYSTEMATIC DIAGRAM
+================================================================================
 
 
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║         ↔  HORIZONTAL POD AUTOSCALING (HPA)                             ║
+  ║             "Scale OUT — add more pods"                                  ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+
+   HIGH TRAFFIC
+   🌐🌐🌐🌐🌐
+       │
+       ▼
+  ┌─────────────┐    reports     ┌──────────────┐    scales    ┌─────────────┐
+  │ 📊 Metrics  │ ────────────► │  🤖 HPA      │ ──────────► │ 🗂️ Deploy-  │
+  │   Server    │               │  Controller  │              │   ment      │
+  └─────────────┘               └──────────────┘              └──────┬──────┘
+                                                                      │
+                                         ┌────────────────────────────┘
+                                         │  creates replicas
+                                         ▼
+          BEFORE                                      AFTER
+          ───────                                     ──────
+        ┌────────┐                ┌────────┐  ┌────────┐  ┌────────┐
+        │📦 Pod 1│                │📦 Pod 1│  │📦 Pod 2│  │📦 Pod 3│
+        │        │    ────────►   │        │  │  NEW   │  │  NEW   │
+        │cpu: 1  │                │cpu: 1  │  │cpu: 1  │  │cpu: 1  │
+        │ram: 1G │                │ram: 1G │  │ram: 1G │  │ram: 1G │
+        └────────┘                └────────┘  └────────┘  └────────┘
+         1 pod                    ◄──────────────────────────────────►
+                                              3 pods (scaled OUT)
+
+  KEY POINTS:
+  • Each pod keeps the SAME resource limits (cpu, ram unchanged)
+  • Total capacity increases by adding more identical pods
+  • 🔼 Load increases  →  HPA adds pods (scale out)
+  • 🔽 Load decreases  →  HPA removes pods (scale in)
 
 
+================================================================================
 
+
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║         ↕  VERTICAL POD AUTOSCALING (VPA)                               ║
+  ║             "Scale UP — make the pod bigger"                             ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+
+   HIGH TRAFFIC
+   🌐🌐🌐🌐🌐
+       │
+       ▼
+  ┌─────────────┐    reports     ┌──────────────┐
+  │ 📊 Metrics  │ ────────────► │  🤖 VPA      │
+  │   Server    │               │  Controller  │
+  └─────────────┘               └──────┬───────┘
+                                        │
+                                        │  restart & resize pod
+                                        ▼
+          BEFORE                                      AFTER
+          ───────                                     ──────
+        ┌────────┐                                  ┌────────┐  ▲
+        │📦 Pod 1│                                  │📦 Pod 1│  │
+        │        │                                  │        │  │ BIGGER
+        │cpu: 0.5│    ────────►                     │cpu: 2  │  │ (scaled
+        │ram:256M│                                  │ram: 1G │  │  UP)
+        └────────┘                                  └────────┘  ▼
+
+         1 pod                                       1 pod
+         small                                       LARGER ✨
+
+  KEY POINTS:
+  • Number of pods stays the SAME (no new pods added)
+  • Pod is restarted with higher CPU and RAM limits
+  • 🔼 Load increases  →  VPA resizes pod (scale up)
+  • 🔽 Load decreases  →  VPA shrinks pod (scale down)
+
+
+================================================================================
+                          SIDE-BY-SIDE COMPARISON
+================================================================================
+
+                    HPA ↔                          VPA ↕
+              ─────────────────────          ─────────────────────
+              Pod count  CHANGES             Pod count  SAME
+              Pod size   SAME                Pod size   CHANGES
+              Strategy   Scale OUT           Strategy   Scale UP
+              Risk       Slower start        Risk       Pod restart
+              Best for   Stateless apps      Best for   Stateful apps
+              ─────────────────────          ─────────────────────
+
+                     ⚡ COMBINE BOTH for maximum efficiency ⚡
+
+================================================================================
+---------------------------------------------------------------------------------------------------
+HPA
+
+vi cpu-php-apache.yaml ---->
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php-apache
+spec:
+  selector:
+    matchLabels:
+      run: php-apache
+  template:
+    metadata:
+      labels:
+        run: php-apache
+    spec:
+      containers:
+      - name: php-apache
+        image: registry.k8s.io/hpa-example
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: 500m
+          requests:
+            cpu: 200m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: php-apache
+  labels:
+    run: php-apache
+spec:
+  ports:
+  - port: 80
+  selector:
+    run: php-apache
+---------------------------------------------------------------------------------------------------
+vi cpu-hpa.yml ----> (CPU Based Scaling)
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: php-apache-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: php-apache
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 10
+---------------------------------------------------------------------------------------------------
+kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://php-apache; done"
+---------------------------------------------------------------------------------------------------
+vi mem-php-apache.yaml ---->
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php-apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: php-apache
+  template:
+    metadata:
+      labels:
+        run: php-apache
+    spec:
+      containers:
+      - name: php-apache
+        image: registry.k8s.io/hpa-example
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 200m
+            memory: 100Mi	#Guaranteed memory per pod
+          limits:
+            cpu: 500m
+            memory: 200Mi	#Max memory pod can use. Incase of >200Mi, Pod is OOMKilled
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: php-apache
+spec:
+  type: ClusterIP
+  selector:
+    run: php-apache
+  ports:
+  - port: 80
+    targetPort: 80
+---------------------------------------------------------------------------------------------------
+vi mem-hpa.yml ----> (MEMORY Based Scaling)
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: php-apache-hpa-memory
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: php-apache
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 10Mi
+---------------------------------------------------------------------------------------------------
+
+If average memory usage per pod exceeds 10Mi, HPA starts scaling
+
+Lets generate load;
+kubectl run -i --tty load-generator \
+  --rm \
+  --restart=Never \
+  --image=busybox:1.28 \
+  -- /bin/sh -c "while true; do wget -q -O- http://php-apache; done"
 
 ----------------------------------------------------------------------
 Task: https://youtu.be/3fhvnsNY5fc?si=U6gX5T9xMQrfMt_P
