@@ -430,6 +430,243 @@ kubectl get svc
 
 kubectl get deploy
 ----------------------------------------------------------------------
+==============================================================================================
+2048 Game with SSL Certificate
+==============================================================================================
+aws eks update-kubeconfig --region <ClusterRegion> --name <ClusterName>
+
+ex
+aws eks update-kubeconfig --region ap-south-1 --name kartik-cluster
+
+Set your cluster name and region in an environment variable:
+
+cluster_name=<ClusterName>
+export AWS_REGION=<ClusterRegion>
+
+ex
+cluster_name=kartik-cluster
+export AWS_REGION=ap-south-1
+
+Extract the OIDC ID from your cluster:
+oidc_id=$(aws eks describe-cluster --name $cluster_name --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
+echo $oidc_id
+
+
+Check if an IAM OIDC provider already exists for your cluster:
+aws iam list-open-id-connect-providers | grep $oidc_id | cut -d "/" -f4
+If output is returned: You already have an IAM OIDC provider and can skip the next step.
+
+
+If no output is returned: Create an IAM OIDC provider for your cluster:
+eksctl utils associate-iam-oidc-provider --cluster <ClusterName> --approve --region <ClusterRegion>
+
+ex 
+eksctl utils associate-iam-oidc-provider --cluster kartik-cluster --approve --region ap-south-1
+
+aws iam list-open-id-connect-providers | grep $oidc_id | cut -d "/" -f4
+
+You will see the output, the same OIDC provider will also be there in EKS Console
+Lets verify;
+
+EKS -----> Open the Cluster ----> Under "Overview" you will see "OpenID Connect provider URL" ----> You can check the OIDC 
+
+Lets configure aws load balancer controller;
+Download the IAM policy required for the AWS Load Balancer Controller:
+curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.11.0/docs/install/iam_policy.json
+ls
+
+You will see a file called "iam_policy.json"
+
+Create the IAM policy:
+aws iam create-policy \
+    --policy-name AWSLoadBalancerControllerIAMPolicy \
+    --policy-document file://iam_policy.json
+
+The name of the policy which we have created is "AWSLoadBalancerControllerIAMPolicy"
+The same policy will be created in IAM console.
+Goto IAM console and verify. Copy the ARN of the policy created.
+use that ARN here
+Ex: "Arn": "arn:aws:iam::037151145720:policy/AWSLoadBalancerControllerIAMPolicy"
+
+3.2 – Create the IAM Service Account
+Create the IAM service account for the AWS Load Balancer Controller using eksctl. This command attaches the policy to the service account and (if it exists) overrides the existing service account:
+
+eksctl create iamserviceaccount \
+    --cluster=<ClusterName> \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller \
+    --attach-policy-arn=<ARNofThePolicy> \
+    --override-existing-serviceaccounts \
+    --region <ClusterRegion> \
+    --approve
+
+Ex:
+eksctl create iamserviceaccount \
+    --cluster=kartik-cluster \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller \
+    --attach-policy-arn=arn:aws:iam::037151145720:policy/AWSLoadBalancerControllerIAMPolicy \
+    --override-existing-serviceaccounts \
+    --region ap-south-1 \
+    --approve
+
+To verify;
+kubectl get sa -n kube-system
+You will see "aws-load-balancer-controller" got created
+
+
+3.3 – Install the AWS Load Balancer Controller using HELM
+#Install HELM
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm version
+
+Add the Helm repository and update it:
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update eks
+
+Install the AWS Load Balancer Controller:
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=<ClusterName> \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller
+
+ex 
+Install the AWS Load Balancer Controller:
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=kartik-cluster \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller
+
+
+3.4 – Verify the Controller Deployment
+Confirm that the controller is installed and running:
+kubectl get deployment -n kube-system aws-load-balancer-controller
+
+Step 4: Deploy the 2048 Game Application
+Below are the four YAML files provided. These files create a dedicated namespace, deploy the 2048 game, create a service, and set up an ingress to expose the application via the ALB.
+----------------------------------------------------------------------
+4.1 – Namespace (namespace.yaml)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: 2048-game
+----------------------------------------------------------------------
+Apply the namespace:
+kubectl apply -f namespace.yaml
+----------------------------------------------------------------------
+4.2 – Deployment (deployment.yaml)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: game-2048-deployment
+  namespace: 2048-game
+  labels:
+    app: game-2048
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: game-2048
+  template:
+    metadata:
+      labels:
+        app: game-2048
+    spec:
+      containers:
+      - name: game-2048
+        image: thipparthiavinash/2048-game
+        ports:
+        - containerPort: 80
+----------------------------------------------------------------------
+Deploy the application:
+kubectl apply -f deployment.yaml
+----------------------------------------------------------------------
+4.3 – Service (service.yaml)
+apiVersion: v1
+kind: Service
+metadata:
+  name: game-2048-service
+  namespace: 2048-game
+  labels:
+    app: game-2048
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: game-2048
+----------------------------------------------------------------------
+Create the Ingress:
+kubectl apply -f service.yaml
+----------------------------------------------------------------------
+4.4 – Ingress (ingress.yaml)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: game-2048-ingress
+  namespace: 2048-game
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: game-2048-service
+            port:
+              number: 80
+----------------------------------------------------------------------
+Create the Ingress:
+kubectl apply -f ingress.yaml
+----------------------------------------------------------------------
+
+4.5 Updated ingress yml
+vi ingress-https.yml file ---->
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: game-2048-ingress
+  namespace: 2048-game
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: <Your-Cert-ARN-From-ACM-Console>
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+spec:
+  rules:
+  - host: game.learnaws.today
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: game-2048-service
+            port:
+              number: 80
+----------------------------------------------------------------------
+Create the Ingress:
+kubectl apply -f ingress-https.yml
+----------------------------------------------------------------------
+
+
+
+
+
+
 
 ----------------------------------------------------------------------
 Task: https://youtu.be/3fhvnsNY5fc?si=U6gX5T9xMQrfMt_P
