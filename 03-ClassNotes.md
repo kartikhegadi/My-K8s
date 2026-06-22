@@ -515,11 +515,13 @@ kubectl exec -it $(kubectl get pods -l app=mysql -o jsonpath='{.items[0].metadat
 
 > **Fix:** Use **StatefulSet + PVC** to give each pod its own persistent volume.
 
+
 #### 🚀 Interesting Projects -- to UnderStand Full Concept of StateFullSet 
 
 ##### Demonstrates deployment StateFullSet strategies .
 
 #####  🔗 **Repository:** [https://github.com/kartikhegadi/My-K8s/tree/main/statefulset]
+
 
 
 ---
