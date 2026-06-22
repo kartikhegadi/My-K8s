@@ -1,0 +1,72 @@
+# --------------------------
+# Headless Service
+# --------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-headless               # Name of the service
+  labels:
+    app: nginx                       # Labels to identify this service
+spec:
+  ports:
+  - port: 80                         # Service port exposed
+    name: web                        # Named port (useful for reference)
+  clusterIP: None                    # Headless Service (no cluster IP assigned)
+                                     # This ensures DNS records are created for each pod
+                                     # Useful in StatefulSets to give stable DNS to pods
+  selector:
+    app: nginx                       # Service selects pods with this label
+---
+# --------------------------
+# StatefulSet
+# --------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginx-statefulset            # StatefulSet name
+spec:
+  serviceName: "nginx-headless"      # MUST point to the headless service
+                                     # This gives pods stable DNS names like:
+                                     # nginx-statefulset-0.nginx-headless.default.svc.cluster.local
+  replicas: 2                        # Number of replicas/pods
+  selector:
+    matchLabels:
+      app: nginx                     # Ensures StatefulSet manages pods with this label
+  template:
+    metadata:
+      labels:
+        app: nginx                   # Pods will have this label
+    spec:
+      containers:
+      - name: nginx                  # Container name
+        image: nginx:1.21            # Nginx image version
+        ports:
+        - containerPort: 80          # Expose container port 80
+          name: web
+        volumeMounts:
+        - name: nginx-storage        # Mount persistent storage
+          mountPath: /usr/share/nginx/html
+                                     # Pod data persists across restarts
+        # Entry command for container
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Script executed when the container starts
+          echo "<h1>StatefulSet Pod: $HOSTNAME</h1>" > /usr/share/nginx/html/index.html
+          echo "<p>Storage Path: /usr/share/nginx/html</p>" >> /usr/share/nginx/html/index.html
+          echo "<p>Pod Started: $(date)</p>" >> /usr/share/nginx/html/index.html
+          nginx -g 'daemon off;'     # Start nginx in foreground mode
+
+  # --------------------------
+  # Persistent Volume Claim Template
+  # --------------------------
+  volumeClaimTemplates:              # Defines PVC for each replica
+  - metadata:
+      name: nginx-storage            # Must match volumeMounts name
+    spec:
+      accessModes: [ "ReadWriteOnce" ] # Each pod gets its own PV (bound separately)
+      storageClassName: kastro-gp3     # Storage class (must exist in cluster)
+      resources:
+        requests:
+          storage: 1Gi                 # Each PVC will request 1Gi storage
