@@ -537,7 +537,29 @@ Node 1  →  [DaemonSet Pod]
 Node 2  →  [DaemonSet Pod]
 Node 3  →  [DaemonSet Pod]
 ```
+```yaml
+vpiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: zomato-daemon
+  labels:
+    app: zomato
+spec:
+  selector:
+  matchLabels:
+    app: zomato
+  template:
+  metadata:
+    labels:
+      name: zomato
+  spec:
+    containers:
+      - name: zomato-container
+        image: kastrov/zomato
+        ports:
+          - containerPort: 3000
 
+```
 ---
 
 ## 📌 Quick Reference
