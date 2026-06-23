@@ -82,5 +82,19 @@ Welcome! 👋 This repository contains classroom notes, YAML manifests, and hand
 | 📕 Day 4 | [Ingress, Autoscaling, ArgoCD & Helm](https://github.com/kartikhegadi/My-K8s/blob/main/04-ClassNotes.md) |
 
 ---
+## 📜 License
+
+See the [`LICENSE`](./LICENSE) file in this repository for details.
+
+---
+
+## 📝 Document Info
+
+| Field | Value |
+|---|---|
+| **Author** | Kartik Hegadi |
+| **Organization** | InfraCorps |
+| **Repository Topic** | Trivy & DevSecOps Container Security Learning Path |
+| **Audience** | DevOps / DevSecOps Engineers & Learners |
 
 ✨ *Happy learning, and welcome to the world of Kubernetes!* ☸️
