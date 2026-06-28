@@ -1,6 +1,14 @@
-![10 Real-World Kubernetes Failures — Set 1](banner.png)
+# ⚙️ 10 Real-World Kubernetes Failures & Their Fixes
+### 🧩 Set 1 — CrashLoopBackOff & Friends
+*Notes by **InfraCorps***
 
 > *A field guide to the Kubernetes failures every DevOps engineer eventually meets — what breaks, why it breaks, and the exact commands to fix it.*
+
+```
+   ☁️  ────────────────────────────────────────  ☁️
+        kubectl get pods → 🔴 CrashLoopBackOff
+   ☁️  ────────────────────────────────────────  ☁️
+```
 
 ---
 
@@ -8,22 +16,22 @@
 
 | # | Failure | One-line Symptom |
 |---|---------|-------------------|
-| [1](#1-crashloopbackoff) | CrashLoopBackOff | Pod restarts endlessly |
-| [2](#2-imagepullbackoff) | ImagePullBackOff | Pod can't fetch its image |
-| [3](#3-the-vanishing-pod) | The Vanishing Pod | `apply` succeeds, no pod appears |
-| [4](#4-instant-parsing-failure) | Instant Parsing Failure | `apply` fails before reaching the cluster |
-| [5](#5-pod-stuck-pending) | Pod Stuck in Pending | No errors, no logs, just stuck |
-| [6](#6-oomkilled) | OOMKilled | Pod killed for using too much memory |
-| [7](#7-silent-restarts-no-logs) | Silent Restarts, No Logs | Restarting, but nothing to read |
-| [8](#8-exit-code-1) | Exit Code 1 | Container dies instantly |
-| [9](#9-deployment-with-no-pods) | Deployment With No Pods | Deployment exists, pods don't |
-| [10](#10-skipped-init-containers) | Skipped Init Containers | Init logic silently ignored |
+| [1](#1--crashloopbackoff) | 🔁 CrashLoopBackOff | Pod restarts endlessly |
+| [2](#2--imagepullbackoff) | 🖼️ ImagePullBackOff | Pod can't fetch its image |
+| [3](#3--the-vanishing-pod) | 👻 The Vanishing Pod | `apply` succeeds, no pod appears |
+| [4](#4--instant-parsing-failure) | 📄 Instant Parsing Failure | `apply` fails before reaching the cluster |
+| [5](#5--pod-stuck-pending) | ⏳ Pod Stuck in Pending | No errors, no logs, just stuck |
+| [6](#6--oomkilled) | 💥 OOMKilled | Pod killed for using too much memory |
+| [7](#7--silent-restarts-no-logs) | 🤐 Silent Restarts, No Logs | Restarting, but nothing to read |
+| [8](#8--exit-code-1) | ❌ Exit Code 1 | Container dies instantly |
+| [9](#9--deployment-with-no-pods) | 🚫 Deployment With No Pods | Deployment exists, pods don't |
+| [10](#10--skipped-init-containers) | ⏭️ Skipped Init Containers | Init logic silently ignored |
 
 ---
 
-## 1. CrashLoopBackOff
+## 1. 🔁 CrashLoopBackOff
 
-![Pod crash loop cycle](crashloop.png)
+`Pod Starts` → `💥 Crashes` → `⏱️ Backs Off & Retries` → *(loops back to start)*
 
 **❓ The question:**
 > One of the most asked Kubernetes interview questions — your application pod keeps going into CrashLoopBackOff. How would you troubleshoot it?
@@ -42,7 +50,7 @@
 
 ---
 
-## 2. ImagePullBackOff
+## 2. 🖼️ ImagePullBackOff
 
 **❓ The question:**
 > The second most asked DevOps interview question — a pod fails with ImagePullBackOff. What could be the reason, and how would you solve it?
@@ -54,15 +62,18 @@
 | 1 | `kubectl get pods` | Identifies the failing pod |
 | 2 | `kubectl describe pod <pod-name>` | Shows the exact step where the pull failed |
 
-**Most common root cause:** the image tag simply doesn't exist in the registry.
+**Most common root cause:** 🏷️ the image tag simply doesn't exist in the registry.
 
 **Fix:** use a different available image tag, or re-run the CI pipeline to rebuild and push the correct image.
 
 ---
 
-## 3. The Vanishing Pod
+## 3. 👻 The Vanishing Pod
 
-![Apply succeeds but no pod is created](vanishing-pod.png)
+```
+$ kubectl apply -f pod.yaml
+pod/my-app configured ✓        ...but → 0 pods running 😶
+```
 
 **❓ The question:**
 > You applied a Kubernetes YAML but no pod got created — even though the CLI says it was configured or created. How would you troubleshoot this?
@@ -78,29 +89,32 @@
 
 ---
 
-## 4. Instant Parsing Failure
+## 4. 📄 Instant Parsing Failure
 
 **❓ The question:**
 > You ran `kubectl apply` and got a parsing error immediately — before it even hit the cluster. What went wrong?
 
 **✅ The answer:**
 
-If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The problem is 100% in the YAML itself, not the cluster. Check these four things:
+If `kubectl apply` fails **instantly**, Kubernetes never even saw your file 🚧. The problem is 100% in the YAML itself, not the cluster. Check these four things:
 
 | # | Check For |
 |---|-----------|
-| 1 | Indentation errors |
-| 2 | Invalid syntax |
-| 3 | Wrong data type |
-| 4 | Run a YAML lint |
+| 1️⃣ | Indentation error |
+| 2️⃣ | Invalid syntax |
+| 3️⃣ | Wrong data type |
+| 4️⃣ | Run a YAML lint |
 
 > 💡 **Takeaway:** A parsing error = the file was broken from the start. Lint before you apply.
 
 ---
 
-## 5. Pod Stuck in Pending
+## 5. ⏳ Pod Stuck in Pending
 
-![Pending pod with no node available](pending.png)
+```
+  😶 No containers   →   [ ⏳ PENDING ]   →   🚫 Can't find a node
+  No errors, no logs                          to schedule on
+```
 
 **❓ The question:**
 > You deployed your pod, but it's stuck in the Pending state — no containers, no errors, no logs. What's blocking it from getting scheduled?
@@ -117,14 +131,14 @@ If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The
 
 ---
 
-## 6. OOMKilled
+## 6. 💥 OOMKilled
 
 **❓ The question:**
 > A Python application pod is killed repeatedly. What's the root cause and fix?
 
 **✅ The answer:**
 
-**OOMKilled** = Out Of Memory Killed. The container used more memory than Kubernetes allocated to it.
+**OOMKilled** = Out Of Memory Killed 🧠💥. The container used more memory than Kubernetes allocated to it.
 
 | Step | Command | Result |
 |------|---------|--------|
@@ -139,7 +153,7 @@ If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The
 
 ---
 
-## 7. Silent Restarts, No Logs
+## 7. 🤐 Silent Restarts, No Logs
 
 **❓ The question:**
 > *(Debugging under 1 minute)* A pod restarts frequently but no logs are visible. How do you debug this?
@@ -160,7 +174,7 @@ If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The
 
 ---
 
-## 8. Exit Code 1
+## 8. ❌ Exit Code 1
 
 **❓ The question:**
 > *(Debugging under 1 minute)* Your container exits immediately with exit code 1. How do you find and fix the failure?
@@ -181,9 +195,11 @@ If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The
 
 ---
 
-## 9. Deployment With No Pods
+## 9. 🚫 Deployment With No Pods
 
-![Deployment created but zero pods running](no-pods.png)
+```
+  ✅ Deployment Created   →   🚫 0 Pods Running   ⟶   🔐 missing pull secret
+```
 
 **❓ The question:**
 > Your deployment was created but no pod started — the YAML looks fine. What could be missing?
@@ -219,20 +235,26 @@ Then link it in the deployment YAML under `imagePullSecrets`, and redeploy:
 kubectl apply -f deployment.yaml
 ```
 
-Once the secret is in place, Kubernetes pulls the image, creates the pod, and starts the container.
+Once the secret is in place 🔑, Kubernetes pulls the image, creates the pod, and starts the container.
 
 ---
 
-## 10. Skipped Init Containers
+## 10. ⏭️ Skipped Init Containers
 
-![Wrong vs correct initContainers placement](init-containers.png)
+```
+  ❌ WRONG                          ✅ CORRECT
+  spec:                            spec:
+    containers:                      initContainers: [...]
+      initContainers: [...]   →      containers:
+      - name: app                      - name: app
+```
 
 **❓ The question:**
 > A pod is created, but its init containers are skipped. What YAML mistake might cause this?
 
 **✅ The answer:**
 
-Init containers must always run **before** the main containers — but if the YAML structure is wrong, Kubernetes simply ignores them.
+Init containers always run **before** the main containers ⏭️ — but if the YAML structure is wrong, Kubernetes simply ignores them.
 
 **The common mistake:** placing `initContainers` *nested inside* `containers`, instead of as a **sibling** at the same level under `spec`.
 
@@ -247,6 +269,10 @@ Init containers must always run **before** the main containers — but if the YA
 
 ---
 
-![End of Set 1](end.png)
+```
+   ✅ ────────────────────────────────────  ✅
+              End of Set 1
+   ✅ ────────────────────────────────────  ✅
+```
 
 <sub>Notes by **InfraCorps** — Set 1 of the Kubernetes Real-World Failures series.</sub>
