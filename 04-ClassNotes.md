@@ -329,9 +329,9 @@ spec:
             - containerPort: 80
 ---
 apiVersion: v1
-kind: Service
+kind: Service    # not mention means it will be ClusterIp
 metadata:
-  name: app1-service  # this service name will be referenced in the ingress yml file
+  name: app1-service  # this service name will be referenced in the ingress yml file 
 spec:
   selector:
     app: app1
@@ -364,7 +364,7 @@ spec:
             - containerPort: 80
 ---
 apiVersion: v1
-kind: Service
+kind: Service      # not mention means it will be ClusterIp
 metadata:
   name: app2-service  # this service name will be referenced in the ingress yml file
 spec:
@@ -399,7 +399,7 @@ spec:
             - containerPort: 80
 ---
 apiVersion: v1
-kind: Service
+kind: Service         # not mention means it will be ClusterIp
 metadata:
   name: app3-service  # this service name will be referenced in the ingress yml file
 spec:

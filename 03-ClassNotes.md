@@ -446,6 +446,377 @@ Used when pods need:
 - **Persistent storage per pod**
 - Mainly for **database workloads**
 
+A **StatefulSet** is a Kubernetes workload object used to manage **stateful applications**. It provides:
+
+- 🏷️ **Stable pod names**
+- 🌐 **Stable network identities**
+- 💾 **Persistent storage**
+- 🔢 **Ordered deployment and scaling**
+- 🛑 **Ordered termination**
+
+### 🎯 Commonly Used For
+
+| | | |
+|---|---|---|
+| 🐬 MySQL | 🐘 PostgreSQL | 🍃 MongoDB |
+| 📨 Kafka | 🔴 Redis Cluster | 🔍 Elasticsearch |
+| 🪐 Cassandra | 🦓 ZooKeeper | |
+
+---
+
+## 🤔 Why Not Deployment?
+
+A **Deployment** creates identical pods that are interchangeable.
+
+```text
+nginx-6c5b7d6f7d-ab12c
+nginx-6c5b7d6f7d-cd34e
+nginx-6c5b7d6f7d-ef56g
+```
+
+If a pod dies, Kubernetes creates another with a **different name**:
+
+```text
+nginx-6c5b7d6f7d-xy78z
+```
+
+> ⚠️ For databases, losing identity and storage is a real problem.
+
+---
+
+## ✅ What StatefulSet Provides
+
+### 1️⃣ Stable Pod Names
+
+Pods are named in order:
+
+```text
+mysql-0
+mysql-1
+mysql-2
+```
+
+Even if `mysql-1` crashes, Kubernetes recreates it as `mysql-1` — 🔁 **the name never changes**.
+
+---
+
+### 2️⃣ Stable DNS Names
+
+Each pod gets a unique DNS entry:
+
+```text
+mysql-0.mysql-service.default.svc.cluster.local
+mysql-1.mysql-service.default.svc.cluster.local
+mysql-2.mysql-service.default.svc.cluster.local
+```
+
+🔗 Pods can communicate reliably with each other.
+
+---
+
+### 3️⃣ Persistent Storage
+
+Each pod gets its **own** volume:
+
+```text
+mysql-0 → PVC → PV
+mysql-1 → PVC → PV
+mysql-2 → PVC → PV
+```
+
+💾 Data remains even if pods restart.
+
+---
+
+### 4️⃣ Ordered Pod Creation
+
+Pods start **sequentially**:
+
+```text
+mysql-0  →  mysql-1  →  mysql-2
+```
+
+⏳ Kubernetes waits for one pod to become `Ready` before creating the next.
+
+---
+
+### 5️⃣ Ordered Deletion
+
+Scaling down from 3 → 1:
+
+```text
+❌ Delete mysql-2
+❌ Delete mysql-1
+✅ Keep   mysql-0
+```
+
+🔄 Reverse-order deletion preserves cluster consistency.
+
+---
+
+## 🏗️ Architecture
+
+```text
+                StatefulSet
+                     |
+        ┌────────────┼────────────┐
+        |            |            |
+     mysql-0       mysql-1      mysql-2
+        |            |            |
+      PVC-0         PVC-1        PVC-2
+        |            |            |
+       PV-0          PV-1         PV-2
+```
+
+---
+
+## 🧪 Simple Example
+
+### 📝 Step 1 — Headless Service
+
+A StatefulSet **requires** a headless service.
+
+**`service.yaml`**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  clusterIP: None
+  selector:
+    app: nginx
+  ports:
+  - port: 80
+```
+
+> 💡 `clusterIP: None` creates a **headless service**, giving each pod its own DNS entry.
+
+---
+
+### 📝 Step 2 — StatefulSet YAML
+
+**`statefulset.yaml`**
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginx
+spec:
+  serviceName: nginx-service
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      labels:
+        app: nginx
+
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+```
+
+**🚀 Apply it:**
+```bash
+kubectl apply -f service.yaml
+kubectl apply -f statefulset.yaml
+```
+
+---
+
+### 🔎 Verify Pods
+
+```bash
+kubectl get pods
+```
+
+```text
+NAME      READY   STATUS
+nginx-0   1/1     Running
+nginx-1   1/1     Running
+nginx-2   1/1     Running
+```
+
+✅ Notice the **fixed numbering**.
+
+---
+
+### 🌐 Check DNS
+
+```bash
+kubectl exec -it nginx-0 -- hostname
+```
+```text
+nginx-0
+```
+
+From inside a pod:
+```bash
+nslookup nginx-1.nginx-service
+```
+```text
+Name: nginx-1.nginx-service.default.svc.cluster.local
+Address: 10.x.x.x
+```
+
+---
+
+## 💾 StatefulSet with Persistent Storage
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: mysql-service
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: mysql
+
+  template:
+    metadata:
+      labels:
+        app: mysql
+
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: password
+
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-storage
+
+    spec:
+      accessModes:
+      - ReadWriteOnce
+
+      resources:
+        requests:
+          storage: 1Gi
+```
+
+Kubernetes creates:
+
+```text
+mysql-0 → PVC: mysql-storage-mysql-0 → PV
+mysql-1 → PVC: mysql-storage-mysql-1 → PV
+```
+
+🔐 Each pod has **separate, dedicated** storage.
+
+---
+
+## 📈 Scaling
+
+**Current:**
+```text
+mysql-0
+mysql-1
+```
+
+**Scale up to 3:**
+```bash
+kubectl scale statefulset mysql --replicas=3
+```
+
+**Result:**
+```text
+mysql-0  →  mysql-1  →  mysql-2
+```
+
+🔢 Pods are always created **in order**.
+
+---
+
+## 💥 Pod Failure & Recovery
+
+Suppose `mysql-1` crashes:
+
+```bash
+kubectl delete pod mysql-1
+```
+
+Kubernetes recreates `mysql-1` with the **same**:
+
+- 🏷️ Name
+- 🌐 DNS identity
+- 💾 Persistent Volume
+
+✅ **Data is preserved.**
+
+---
+
+## ⚖️ Deployment vs StatefulSet
+
+| Feature 🧩 | Deployment 🐄 | StatefulSet 🐱 |
+|---|---|---|
+| Pod names | Random | Fixed |
+| Pod identity | ❌ No | ✅ Yes |
+| Storage | Shared / Ephemeral | Dedicated |
+| Ordered startup | ❌ No | ✅ Yes |
+| Ordered deletion | ❌ No | ✅ Yes |
+| DNS identity | Shared | Unique |
+| Use case | Stateless apps | Stateful apps |
+
+---
+
+## 🌍 Real-World Examples
+
+### 🐄 Deployment (Stateless)
+```text
+Frontend  •  Backend API  •  Nginx  •  Apache  •  Node.js  •  React
+```
+🔁 Pods are interchangeable.
+
+### 🐱 StatefulSet (Stateful)
+```text
+MySQL  •  PostgreSQL  •  MongoDB  •  Kafka
+Redis Cluster  •  Cassandra  •  ZooKeeper  •  Elasticsearch
+```
+These apps require:
+- 🆔 Unique identities
+- 💾 Persistent data
+- 📋 Predictable startup order
+
+---
+
+## 🧠 Memory Trick
+
+> 🐄 **Deployment = Cattle**
+> Any pod can be replaced — no one cares which one.
+> ```text
+> web-abc   web-def   web-xyz
+> ```
+
+> 🐱 **StatefulSet = Pets**
+> Every pod has its own name and storage — you'd notice if one went missing.
+> ```text
+> mysql-0   mysql-1   mysql-2
+> ```
+
+### 🎯 Bottom Line
+
+> **Deployment** → Stateless Applications 🐄
+> **StatefulSet** → Applications that need data & identity 🐱
+
 ### ❌ Problem with Deployments for Databases
 
 ```bash
@@ -515,6 +886,15 @@ kubectl exec -it $(kubectl get pods -l app=mysql -o jsonpath='{.items[0].metadat
 
 > **Fix:** Use **StatefulSet + PVC** to give each pod its own persistent volume.
 
+
+#### 🚀 Interesting Projects -- to UnderStand Full Concept of StateFullSet 
+
+##### Demonstrates deployment StateFullSet strategies .
+
+#####  🔗 **Repository:** [https://github.com/kartikhegadi/My-K8s/tree/main/statefulset]
+
+
+
 ---
 
 ## 👾 DaemonSet
@@ -528,7 +908,29 @@ Node 1  →  [DaemonSet Pod]
 Node 2  →  [DaemonSet Pod]
 Node 3  →  [DaemonSet Pod]
 ```
+```yaml
+vpiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: zomato-daemon
+  labels:
+    app: zomato
+spec:
+  selector:
+  matchLabels:
+    app: zomato
+  template:
+  metadata:
+    labels:
+      name: zomato
+  spec:
+    containers:
+      - name: zomato-container
+        image: kastrov/zomato
+        ports:
+          - containerPort: 3000
 
+```
 ---
 
 ## 📌 Quick Reference
