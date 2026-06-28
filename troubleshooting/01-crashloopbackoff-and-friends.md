@@ -1,4 +1,4 @@
-![10 Real-World Kubernetes Failures — Set 1](images/banner.png)
+![10 Real-World Kubernetes Failures — Set 1](banner.png)
 
 > *A field guide to the Kubernetes failures every DevOps engineer eventually meets — what breaks, why it breaks, and the exact commands to fix it.*
 
@@ -23,7 +23,7 @@
 
 ## 1. CrashLoopBackOff
 
-![Pod crash loop cycle](images/crashloop.png)
+![Pod crash loop cycle](crashloop.png)
 
 **❓ The question:**
 > One of the most asked Kubernetes interview questions — your application pod keeps going into CrashLoopBackOff. How would you troubleshoot it?
@@ -62,7 +62,7 @@
 
 ## 3. The Vanishing Pod
 
-![Apply succeeds but no pod is created](images/vanishing-pod.png)
+![Apply succeeds but no pod is created](vanishing-pod.png)
 
 **❓ The question:**
 > You applied a Kubernetes YAML but no pod got created — even though the CLI says it was configured or created. How would you troubleshoot this?
@@ -100,7 +100,7 @@ If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The
 
 ## 5. Pod Stuck in Pending
 
-![Pending pod with no node available](images/pending.png)
+![Pending pod with no node available](pending.png)
 
 **❓ The question:**
 > You deployed your pod, but it's stuck in the Pending state — no containers, no errors, no logs. What's blocking it from getting scheduled?
@@ -183,7 +183,7 @@ If `kubectl apply` fails **instantly**, Kubernetes never even saw your file. The
 
 ## 9. Deployment With No Pods
 
-![Deployment created but zero pods running](images/no-pods.png)
+![Deployment created but zero pods running](no-pods.png)
 
 **❓ The question:**
 > Your deployment was created but no pod started — the YAML looks fine. What could be missing?
@@ -225,7 +225,7 @@ Once the secret is in place, Kubernetes pulls the image, creates the pod, and st
 
 ## 10. Skipped Init Containers
 
-![Wrong vs correct initContainers placement](images/init-containers.png)
+![Wrong vs correct initContainers placement](init-containers.png)
 
 **❓ The question:**
 > A pod is created, but its init containers are skipped. What YAML mistake might cause this?
@@ -247,6 +247,6 @@ Init containers must always run **before** the main containers — but if the YA
 
 ---
 
-![End of Set 1](images/end.png)
+![End of Set 1](end.png)
 
 <sub>Notes by **InfraCorps** — Set 1 of the Kubernetes Real-World Failures series.</sub>
